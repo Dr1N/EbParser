@@ -1,14 +1,25 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace EbParser
 {
     class Program
     {
-        static async void Main(string[] args)
+        static void Main(string[] args)
+        {
+            try
+            {
+                MainAsync(args).ConfigureAwait(false).GetAwaiter().GetResult();
+            }
+            catch { }
+
+            Console.ReadLine();
+        }
+
+        static async Task MainAsync(string[] args)
         {
             var stopWatch = Stopwatch.StartNew();
-           
             var worker = new Parser();
             worker.PageChangded += Worker_PageChangded;
             worker.Error += Worker_Error;
@@ -19,12 +30,10 @@ namespace EbParser
 
         private static void Worker_Error(object sender, string e)
         {
-            throw new NotImplementedException();
         }
 
         private static void Worker_PageChangded(object sender, Uri e)
         {
-            throw new NotImplementedException();
         }
     }
 }
