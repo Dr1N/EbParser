@@ -1,4 +1,5 @@
-﻿using EbParser.Interfaces;
+﻿using CloudFlareUtilities;
+using EbParser.Interfaces;
 using System;
 using System.Diagnostics;
 using System.Net.Http;
@@ -8,8 +9,55 @@ using System.Threading.Tasks;
 
 namespace EbParser.Core
 {
-    class PageLoader : IPageLoader
+    class PageLoader : IPageLoader, IDisposable
     {
+        #region Fields
+
+        private readonly HttpClientHandler _httpClientHandler;
+        private readonly ClearanceHandler _clearanceHandler;
+        private readonly HttpClient _httpClient;
+
+        #endregion
+
+        #region Life
+
+        public PageLoader()
+        {
+            _httpClientHandler = new HttpClientHandler();
+            _clearanceHandler = new ClearanceHandler(_httpClientHandler);
+            _httpClient = new HttpClient(_clearanceHandler, false);
+        }
+
+        #region IDisposable Support
+
+        private bool disposedValue = false;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    _httpClientHandler.Dispose();
+                    _clearanceHandler.Dispose();
+                    _httpClient.Dispose();
+                }
+
+                disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+
+        #endregion
+
+        #endregion
+
+        #region IPageLoader implentation
+
         public async Task<string> LoadPageAsync(string url)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
@@ -20,17 +68,16 @@ namespace EbParser.Core
             string result = null;
             try
             {
-                using var client = new HttpClient();
                 using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                using var response = await client.SendAsync(request, CancellationToken.None);
-                //if (response.IsSuccessStatusCode)
+                using var response = await _httpClient.SendAsync(request, CancellationToken.None);
+                if (response.IsSuccessStatusCode)
                 {
                     result = await response.Content.ReadAsStringAsync();
                 }
-                //else
-                //{
-                //    HandleException(new Exception($"Status Code: {response.StatusCode}"));
-                //}
+                else
+                {
+                    HandleException(new Exception($"Status Code: [{response.StatusCode}]"));
+                }
             }
             catch (HttpRequestException httpex)
             {
@@ -44,10 +91,16 @@ namespace EbParser.Core
             return result;
         }
 
+        #endregion
+
+        #region Private
+
         private void HandleException(Exception ex, [CallerMemberName]string src = "N/A")
         {
-            Debug.WriteLine($"{src}: {ex.Message}");
+            Debug.WriteLine($"[{src}]: {ex.Message}");
             throw ex;
         }
+
+        #endregion
     }
 }

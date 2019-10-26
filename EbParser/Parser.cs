@@ -1,8 +1,7 @@
-﻿using System;
-using System.Diagnostics;
-using System.Threading.Tasks;
-using EbParser.Core;
+﻿using EbParser.Core;
 using EbParser.Interfaces;
+using System;
+using System.Threading.Tasks;
 
 namespace EbParser
 {
@@ -20,10 +19,11 @@ namespace EbParser
 
         public async Task ParseAsync()
         {
-            var loader = new PageLoader();
-            var page = await loader.LoadPageAsync(Base);
-
-            Debug.WriteLine(page.Length);
+            string page1 = "https://ebanoe.it/";
+            string page2 = "https://ebanoe.it/page/2/";
+            using var loader = new PageLoader();
+            var html1 = await loader.LoadPageAsync(page1);
+            var html2 = await loader.LoadPageAsync(page2);
         }
     }
 }
