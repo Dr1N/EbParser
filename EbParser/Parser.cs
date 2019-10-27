@@ -11,6 +11,8 @@ namespace EbParser
 
         private const string Base = "https://ebanoe.it/";
 
+        private const string PostTitleSelector = "h3.entry-title a";
+
         #endregion
 
         public event EventHandler<Uri> PageChangded = delegate { };
@@ -19,11 +21,15 @@ namespace EbParser
 
         public async Task ParseAsync()
         {
-            string page1 = "https://ebanoe.it/";
-            string page2 = "https://ebanoe.it/page/2/";
             using var loader = new PageLoader();
-            var html1 = await loader.LoadPageAsync(page1);
-            var html2 = await loader.LoadPageAsync(page2);
+            var content = await loader.LoadPageAsync(Base);
+            var parser = new AngelParser();
+            var postTitles = await parser.ParseHtmlAsync(content, PostTitleSelector);
+            foreach (var link in postTitles)
+            {
+                var href = await parser.ParseAttributeAsync(link, "a", "href");
+                Console.WriteLine($"{href}");
+            }
         }
     }
 }
