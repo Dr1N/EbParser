@@ -30,6 +30,9 @@ namespace EbParser.Context
         [ForeignKey("PostId")]
         public ICollection<Comment> Comments { get; set; }
 
-        public DateTime Created { get; set; }
+        [ForeignKey("PostId")]
+        public ICollection<File> Files { get; set; }
+
+        public DateTime Updated { get; set; }
     }
 }
