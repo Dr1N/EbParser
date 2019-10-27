@@ -10,9 +10,16 @@ namespace EbParser.Context
 
         public DbSet<File> Files { get; set; }
 
+        public DbSet<PostTag> PostTags { get; set; }
+
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
             options.UseSqlite("Data Source=eb.db");
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<PostTag>().HasKey(sc => new { sc.PostId, sc.TagId });
         }
     }
 }

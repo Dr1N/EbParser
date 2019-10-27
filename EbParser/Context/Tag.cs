@@ -10,8 +10,8 @@ namespace EbParser.Context
 
         [StringLength(64)]
         [Required]
-        public string Value { get; set; }
+        public string Name { get; set; }
 
-        public virtual ICollection<Post> Posts { get; set; }
+        public ICollection<PostTag> PostTags { get; set; }
     }
 }
