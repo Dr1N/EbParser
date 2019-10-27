@@ -25,7 +25,7 @@ namespace EbParser.Context
         [Required]
         public string Content { get; set; }
 
-        public ICollection<string> Tags { get; set; }
+        public virtual ICollection<Tag> Tags { get; set; }
 
         [ForeignKey("PostId")]
         public ICollection<Comment> Comments { get; set; }
