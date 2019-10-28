@@ -24,6 +24,9 @@ namespace EbParser.Context
         [Required]
         public string Content { get; set; }
 
+        [StringLength(32)]
+        public string Category { get; set; }
+
         public ICollection<PostTag> PostTags { get; set; }
 
         [ForeignKey("PostId")]

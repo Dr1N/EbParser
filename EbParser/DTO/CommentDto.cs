@@ -6,5 +6,6 @@ namespace EbParser.DTO
 {
     class CommentDto
     {
+        
     }
 }
