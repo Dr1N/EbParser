@@ -38,5 +38,9 @@ namespace EbParser
                 }
             }
         }
+
+        #region Private
+
+        #endregion
     }
 }
