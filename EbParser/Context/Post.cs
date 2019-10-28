@@ -18,9 +18,8 @@ namespace EbParser.Context
         [Required]
         public string Title { get; set; }
 
-        [StringLength(128)]
         [Required]
-        public string Date { get; set; }
+        public DateTime Publish { get; set; }
 
         [Required]
         public string Content { get; set; }

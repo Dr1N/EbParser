@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EbParser.Context
@@ -12,9 +13,8 @@ namespace EbParser.Context
         [Required]
         public string Author { get; set; }
 
-        [StringLength(128)]
         [Required]
-        public string Date { get; set; }
+        public DateTime Publish { get; set; }
 
         [ForeignKey("Post")]
         [Required]
