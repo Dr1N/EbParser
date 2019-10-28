@@ -23,12 +23,19 @@ namespace EbParser
         {
             using var loader = new PageLoader();
             var content = await loader.LoadPageAsync(Base);
-            var parser = new AngelParser();
+            using var parser = new AngelParser();
             var postTitles = await parser.ParseHtmlAsync(content, PostTitleSelector);
-            foreach (var link in postTitles)
+            foreach (var title in postTitles)
             {
-                var href = await parser.ParseAttributeAsync(link, "a", "href");
-                Console.WriteLine($"{href}");
+                try
+                {
+                    var postLink = await parser.ParseAttributeAsync(title, "a", "href");
+                    var postPage = await loader.LoadPageAsync(postLink);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
             }
         }
     }
