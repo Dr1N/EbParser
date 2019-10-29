@@ -23,6 +23,14 @@ namespace EbParser
         private const string PostCategorytSelector = "div.category a";
         private const string PostTagstSelector = "ul.post-tags li";
 
+        private const string PostCommentContainerSelector = "ol.commentlist";
+        private const string PostCommentListSelector = "ol.commentlist li.comment";
+        private const string PostCommentParentPattern = "li#comment-{0}";
+        private const string PostCommentAuthorSelector = "cite.fn";
+        private const string PostCommentDateSelector = "div.commentmetadata";
+        private const string PostCommentIdSelector = "div.comment-body";
+        private const string PostCommentContentSelector = "p";
+
         #endregion
 
         #region Fields
@@ -90,17 +98,16 @@ namespace EbParser
                         try
                         {
                             var postLink = await _parser.ParseAttributeAsync(title, "a", "href");
-                            if (string.IsNullOrEmpty(postLink))
-                            {
-                                continue;
-                            }
+                            
+                            if (string.IsNullOrEmpty(postLink)) continue;
+                            
                             RaisePage(new Uri(postLink));
                             var pageHtml = await _loader.LoadPageAsync(postLink);
-                            if (string.IsNullOrEmpty(pageHtml))
-                            {
-                                continue;
-                            }
+                            
+                            if (string.IsNullOrEmpty(pageHtml)) continue;
+                            
                             var post = GetPostDtoAsync(pageHtml);
+                            var comments = GetPostCommentsAsync(pageHtml);
 
                             break;
                         }
@@ -152,6 +159,51 @@ namespace EbParser
                 var tagName = await _parser.ParseTextAsync(tag, "a");
                 result.Add(tagName);
             }
+
+            return result;
+        }
+
+        private async Task<IList<CommentDto>> GetPostCommentsAsync(string pageHtml)
+        {
+            var result = new List<CommentDto>();
+
+            var commentContainer = (await _parser.ParseHtmlAsync(pageHtml, PostCommentContainerSelector)).FirstOrDefault();
+            var commentsList = await _parser.ParseHtmlAsync(pageHtml, PostCommentListSelector);
+            foreach (var comment in commentsList)
+            {
+                result.Add(await GetCommentFromItem(comment));
+            }
+
+            foreach (var item in result)
+            {
+                var parent = await GetCommentParent(commentContainer, item.Id);
+                //TODO: Find parent
+            }
+
+            return result;
+        }
+
+        private async Task<CommentDto> GetCommentFromItem(string commentItemHtml)
+        {
+            var id = await _parser.ParseAttributeAsync(commentItemHtml, PostCommentIdSelector, "id");
+            var author = await _parser.ParseTextAsync(commentItemHtml, PostCommentAuthorSelector);
+            var publish = await _parser.ParseTextAsync(commentItemHtml, PostCommentDateSelector);
+            var content = await _parser.ParseTextAsync(commentItemHtml, PostCommentContentSelector);
+
+            return new CommentDto()
+            {
+                Id = id,
+                Author = author,
+                Publish = publish,
+                Content = content,
+            };
+        }
+
+        private async Task<string> GetCommentParent(string container, string id)
+        {
+            var intId = int.Parse(id.Split('-').Last());
+            var selector = string.Format(PostCommentParentPattern, intId);
+            string result = await _parser.FindParentAsync(container, selector);
 
             return result;
         }

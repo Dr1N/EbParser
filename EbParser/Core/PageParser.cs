@@ -158,6 +158,27 @@ namespace EbParser.Core
             return result;
         }
 
+        public async Task<string> FindParentAsync(string html, string selector) //TODO parent type
+        {
+            if (string.IsNullOrEmpty(html))
+            {
+                throw new ArgumentNullException(nameof(html));
+            }
+
+            string result = null;
+            var document = await _browsingContext.OpenAsync(req => req.Content(html));
+            if (document != null && document.All.Any())
+            {
+                var element = document.QuerySelector(selector);
+                if (element != null)
+                {
+                    result = element.ParentElement.OuterHtml;
+                }
+            }
+
+            return result;
+        }
+
         #endregion
 
         #region Private
