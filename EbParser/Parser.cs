@@ -13,6 +13,7 @@ namespace EbParser
     {
         #region Constants
 
+        private const string Site = "https://ebanoe.it";
         private const string Pattern = "https://ebanoe.it/page/{0}/";
 
         #endregion
@@ -88,8 +89,28 @@ namespace EbParser
 
         #region Private
 
+        private async Task TestAsync()
+        {
+            await Task.Delay(100);
+            Console.WriteLine("Hello test");
+        }
+
+        #region Parsing
+
+        private async Task<int> ParsePagesCount()
+        {
+            var site = await _loader.LoadPageAsync(Site);
+            var pages = await _parser.ParseHtmlAsync(site, EbSelectors.PagesSelector);
+            var last = pages.Last();
+            var result = await _parser.ParseTextAsync(last, "a");
+
+            return int.Parse(result);
+        }
+
         private async Task ParseSiteAsync()
         {
+            var p = await ParsePagesCount();
+
             var pageUrl = string.Format(Pattern, 1);
             RaisePage(new Uri(pageUrl));
             try
@@ -114,112 +135,6 @@ namespace EbParser
                 RaiseError(ex.Message);
             }
         }
-
-        private async Task TestAsync()
-        {
-            await Task.Delay(100);
-            Console.WriteLine("Hello test");
-        }
-
-        #region Saving
-
-        private async Task SaveToBaseAsync(PostDto postDto, IList<CommentDto> commentDTOs)
-        {
-            using var db = new SiteContext();
-            var tags = await ProcessTags(db, postDto.Tags);
-            var post = await ProcessPost(db, postDto);
-            var comments = await ProcessComments(db, commentDTOs, post);
-        }
-
-        private async Task<IList<Tag>> ProcessTags(SiteContext db, IList<string> tags)
-        {
-            foreach (var tag in tags)
-            {
-                var dbTag = db.Tags.FirstOrDefault(t => t.Name == tag);
-                if (dbTag == null)
-                {
-                    db.Tags.Add(new Tag() { Name = tag });
-                }
-            }
-            await db.SaveChangesAsync();
-
-            return db.Tags.ToList();
-        }
-
-        private async Task<Post> ProcessPost(SiteContext db, PostDto postDto)
-        {
-            var post = new Post()
-            {
-                Url = postDto.Url,
-                Title = postDto.Title,
-                Publish = postDto.Publish,
-                Content = postDto.Content,
-                Category = postDto.Category,
-                Updated = DateTime.Now,
-            };
-            foreach (var tag in postDto.Tags)
-            {
-                var dbTag = db.Tags.FirstOrDefault(t => t.Name == tag);
-                var postTag = new PostTag() { Post = post, Tag = dbTag };
-                db.PostTags.Add(postTag);
-            }
-            db.Posts.Add(post);
-            await db.SaveChangesAsync();
-
-            return post;
-        }
-
-        private async Task<IList<Comment>> ProcessComments(SiteContext db, IList<CommentDto> comments, Post post)
-        {
-            var firstLevelComments = comments.Where(c => c.ParrentId == 0).ToList();
-            foreach (var comment in firstLevelComments)
-            {
-                var dbComment = new Comment()
-                {
-                    Author = comment.Author,
-                    Publish = comment.Publish,
-                    PostId = post.Id,
-                    Content = comment.Content,
-                    ParentId = null,
-                    Updated = DateTime.Now,
-                };
-                db.Comments.Add(dbComment);
-                await db.SaveChangesAsync();
-
-                await SaveChildComments(db, comments, comment, dbComment.Id, post.Id);
-            }
-
-            return db.Comments.ToList();
-        }
-
-        private async Task SaveChildComments(SiteContext db, IList<CommentDto> allComments, CommentDto parent, int parentId, int postId)
-        {
-            var children = allComments.Where(c => c.ParrentId == parent.Id).ToList();
-            if (children.Count == 0)
-            {
-                return;
-            }
-            foreach (var child in children)
-            {
-                var dbComment = new Comment()
-                {
-                    Author = child.Author,
-                    Publish = child.Publish,
-                    PostId = postId,
-                    Content = child.Content,
-                    ParentId = parentId,
-                    Updated = DateTime.Now,
-                };
-                db.Comments.Add(dbComment);
-                await db.SaveChangesAsync();
-
-                await SaveChildComments(db, allComments, child, dbComment.Id, postId);
-            }
-        }
-
-        #endregion
-
-        #region Parsing
 
         private async Task ParsePostAsync(string linkTag)
         {
@@ -342,6 +257,104 @@ namespace EbParser
             var result = await _parser.FindParentAsync(container, selector, "li");
 
             return result;
+        }
+
+        #endregion
+
+        #region Saving
+
+        private async Task SaveToBaseAsync(PostDto postDto, IList<CommentDto> commentDTOs)
+        {
+            using var db = new SiteContext();
+            var tags = await ProcessTags(db, postDto.Tags);
+            var post = await ProcessPost(db, postDto);
+            var comments = await ProcessComments(db, commentDTOs, post);
+        }
+
+        private async Task<IList<Tag>> ProcessTags(SiteContext db, IList<string> tags)
+        {
+            foreach (var tag in tags)
+            {
+                var dbTag = db.Tags.FirstOrDefault(t => t.Name == tag);
+                if (dbTag == null)
+                {
+                    db.Tags.Add(new Tag() { Name = tag });
+                }
+            }
+            await db.SaveChangesAsync();
+
+            return db.Tags.ToList();
+        }
+
+        private async Task<Post> ProcessPost(SiteContext db, PostDto postDto)
+        {
+            var post = new Post()
+            {
+                Url = postDto.Url,
+                Title = postDto.Title,
+                Publish = postDto.Publish,
+                Content = postDto.Content,
+                Category = postDto.Category,
+                Updated = DateTime.Now,
+            };
+            foreach (var tag in postDto.Tags)
+            {
+                var dbTag = db.Tags.FirstOrDefault(t => t.Name == tag);
+                var postTag = new PostTag() { Post = post, Tag = dbTag };
+                db.PostTags.Add(postTag);
+            }
+            db.Posts.Add(post);
+            await db.SaveChangesAsync();
+
+            return post;
+        }
+
+        private async Task<IList<Comment>> ProcessComments(SiteContext db, IList<CommentDto> comments, Post post)
+        {
+            var firstLevelComments = comments.Where(c => c.ParrentId == 0).ToList();
+            foreach (var comment in firstLevelComments)
+            {
+                var dbComment = new Comment()
+                {
+                    Author = comment.Author,
+                    Publish = comment.Publish,
+                    PostId = post.Id,
+                    Content = comment.Content,
+                    ParentId = null,
+                    Updated = DateTime.Now,
+                };
+                db.Comments.Add(dbComment);
+                await db.SaveChangesAsync();
+
+                await SaveChildComments(db, comments, comment, dbComment.Id, post.Id);
+            }
+
+            return db.Comments.ToList();
+        }
+
+        private async Task SaveChildComments(SiteContext db, IList<CommentDto> allComments, CommentDto parent, int parentId, int postId)
+        {
+            var children = allComments.Where(c => c.ParrentId == parent.Id).ToList();
+            if (children.Count == 0)
+            {
+                return;
+            }
+            foreach (var child in children)
+            {
+                var dbComment = new Comment()
+                {
+                    Author = child.Author,
+                    Publish = child.Publish,
+                    PostId = postId,
+                    Content = child.Content,
+                    ParentId = parentId,
+                    Updated = DateTime.Now,
+                };
+                db.Comments.Add(dbComment);
+                await db.SaveChangesAsync();
+
+                await SaveChildComments(db, allComments, child, dbComment.Id, postId);
+            }
         }
 
         #endregion

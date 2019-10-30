@@ -2,6 +2,7 @@
 {
     static class EbSelectors
     {
+        public const string PagesSelector = "div.pages>a.page";
         public const string PostLinkSelector = "h3.entry-title a";
         public const string PostTitleSelector = "h1.entry-title";
         public const string PostAuthorSelector = "div.author-date a";
