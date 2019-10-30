@@ -13,7 +13,7 @@ namespace EbParser.DTO
 
         public string Poster { get; set; }
 
-        public DateTime Publish { get; set; }
+        public DateTimeOffset Publish { get; set; }
 
         public string Author { get; set; }
 

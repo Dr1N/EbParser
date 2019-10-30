@@ -28,5 +28,8 @@ namespace EbParser.Context
         public int ParentId { get; set; }
 
         public Comment ParentComment { get; set; }
+
+        [Required]
+        public DateTime Updated { get; set; }
     }
 }

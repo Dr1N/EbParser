@@ -11,6 +11,6 @@ namespace EbParser.Interfaces
 
         Task<string> ParseTextAsync(string html, string selector);
 
-        Task<string> FindParentAsync(string html, string selector);
+        Task<string> FindParentAsync(string html, string selector, string parentTag);
     }
 }

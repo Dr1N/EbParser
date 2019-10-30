@@ -4,13 +4,13 @@ namespace EbParser.DTO
 {
     class CommentDto
     {
-        public string Id { get; set; }
+        public int Id { get; set; }
 
-        public string ParrentId { get; set; }
+        public int ParrentId { get; set; }
 
         public string Author { get; set; }
 
-        public string Publish { get; set; }
+        public DateTime Publish { get; set; }
 
         public string Content { get; set; }
     }

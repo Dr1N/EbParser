@@ -35,6 +35,7 @@ namespace EbParser.Context
         [ForeignKey("PostId")]
         public ICollection<File> Files { get; set; }
 
+        [Required]
         public DateTime Updated { get; set; }
     }
 }

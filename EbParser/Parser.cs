@@ -1,4 +1,5 @@
-﻿using EbParser.Core;
+﻿using EbParser.Context;
+using EbParser.Core;
 using EbParser.DTO;
 using EbParser.Interfaces;
 using System;
@@ -83,6 +84,8 @@ namespace EbParser
 
         #endregion
 
+        #region IParser Implementation
+
         public async Task ParseAsync()
         {
             var pageUrl = string.Format(Pattern, 0);
@@ -91,23 +94,24 @@ namespace EbParser
                 RaisePage(uri);
                 try
                 {
-                    var content = await _loader.LoadPageAsync(pageUrl);
-                    var postTitles = await _parser.ParseHtmlAsync(content, PostLinkSelector);
+                    var postTitles = await GetPostFromPage(pageUrl);
                     foreach (var title in postTitles)
                     {
                         try
                         {
                             var postLink = await _parser.ParseAttributeAsync(title, "a", "href");
-                            
+
                             if (string.IsNullOrEmpty(postLink)) continue;
-                            
+
                             RaisePage(new Uri(postLink));
                             var pageHtml = await _loader.LoadPageAsync(postLink);
-                            
+
                             if (string.IsNullOrEmpty(pageHtml)) continue;
-                            
-                            var post = GetPostDtoAsync(pageHtml);
-                            var comments = GetPostCommentsAsync(pageHtml);
+
+                            var post = await GetPostDtoAsync(pageHtml);
+                            var comments = await GetPostCommentsAsync(pageHtml);
+
+                            await SaveToBase(post, comments);
 
                             break;
                         }
@@ -116,7 +120,6 @@ namespace EbParser
                             RaiseError(ex.Message);
                         }
                     }
-
                 }
                 catch (Exception ex)
                 {
@@ -125,7 +128,40 @@ namespace EbParser
             }
         }
 
+        #endregion
+
         #region Private
+
+        private async Task<IList<string>> GetPostFromPage(string pageUrl)
+        {
+            var content = await _loader.LoadPageAsync(pageUrl);
+            var postTitles = await _parser.ParseHtmlAsync(content, PostLinkSelector);
+
+            return postTitles;
+        }
+
+        private async Task SaveToBase(PostDto post, IList<CommentDto> comments)
+        {
+            using (var db = new SiteContext())
+            {
+                await ProcessTags(db, post.Tags);
+
+            }
+            await SavePost(post);
+            await SaveComments(post, comments);
+        }
+
+        private async Task ProcessTags(SiteContext db, IList<string> tags)
+        {
+            foreach (var tag in tags)
+            {
+                var dbTag = db.Tag
+                if (true)
+                {
+
+                }
+            }
+        }
 
         private async Task<PostDto> GetPostDtoAsync(string pageHtml)
         {
@@ -169,15 +205,24 @@ namespace EbParser
 
             var commentContainer = (await _parser.ParseHtmlAsync(pageHtml, PostCommentContainerSelector)).FirstOrDefault();
             var commentsList = await _parser.ParseHtmlAsync(pageHtml, PostCommentListSelector);
+            
+            // Find comments
+            
             foreach (var comment in commentsList)
             {
                 result.Add(await GetCommentFromItem(comment));
             }
 
+            // Find parents for comments
+
             foreach (var item in result)
             {
                 var parent = await GetCommentParent(commentContainer, item.Id);
-                //TODO: Find parent
+                if (parent != null)
+                {
+                    var parentId = await _parser.ParseAttributeAsync(parent, PostCommentIdSelector, "id");
+                    item.ParrentId = int.Parse(parentId.Split('-').Last());
+                }
             }
 
             return result;
@@ -192,18 +237,25 @@ namespace EbParser
 
             return new CommentDto()
             {
-                Id = id,
+                Id = int.Parse(id.Split('-').Last()),
                 Author = author,
-                Publish = publish,
+                Publish = ParseCommentPublishTime(publish),
                 Content = content,
             };
         }
 
-        private async Task<string> GetCommentParent(string container, string id)
+        private DateTime ParseCommentPublishTime(string publish)
         {
-            var intId = int.Parse(id.Split('-').Last());
-            var selector = string.Format(PostCommentParentPattern, intId);
-            string result = await _parser.FindParentAsync(container, selector);
+            var dateTimeStr = publish.Replace("в", "");
+            var result = DateTime.Parse(string.Join(' ', dateTimeStr));
+
+            return result;
+        }
+
+        private async Task<string> GetCommentParent(string container, int id)
+        {
+            var selector = string.Format(PostCommentParentPattern, id);
+            var result = await _parser.FindParentAsync(container, selector, "li");
 
             return result;
         }

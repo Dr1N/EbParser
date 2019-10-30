@@ -158,7 +158,7 @@ namespace EbParser.Core
             return result;
         }
 
-        public async Task<string> FindParentAsync(string html, string selector) //TODO parent type
+        public async Task<string> FindParentAsync(string html, string selector, string parent = null) //TODO parent type
         {
             if (string.IsNullOrEmpty(html))
             {
@@ -172,7 +172,33 @@ namespace EbParser.Core
                 var element = document.QuerySelector(selector);
                 if (element != null)
                 {
-                    result = element.ParentElement.OuterHtml;
+                    var parentElement = element.ParentElement;
+                    while (true)
+                    {
+                        if (parentElement == null 
+                            || string.Compare(parentElement.TagName, "body") == 0
+                            || string.Compare(parentElement.TagName, "html") == 0)
+                        {
+                            break;
+                        }
+                        if (!string.IsNullOrEmpty(parent))
+                        {
+                            if (string.Compare(parentElement.TagName, parent, StringComparison.OrdinalIgnoreCase) == 0)
+                            {
+                                result = parentElement.OuterHtml;
+                                break;
+                            }
+                            else
+                            {
+                                parentElement = parentElement.ParentElement;
+                            }
+                        }
+                        else
+                        {
+                            result = element?.ParentElement.OuterHtml;
+                            break;
+                        }
+                    }
                 }
             }
 
