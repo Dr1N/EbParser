@@ -148,6 +148,7 @@ namespace EbParser
             RaiseReport("Page parsed...");
             await SaveToBaseAsync(post, comments);
             RaiseReport("Saved post");
+            //TODO: Save Files
         }
 
         private async Task<IList<string>> GetPostLinksFromPageAsync(string pageUrl)
