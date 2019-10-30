@@ -16,8 +16,8 @@ namespace EbParser.Context
         [StringLength(128)]
         public string Path { get; set; }
 
-        [ForeignKey("Post")]
         [Required]
+        [ForeignKey("Post")]
         public int PostId { get; set; }
 
         public Post Post { get; set; }

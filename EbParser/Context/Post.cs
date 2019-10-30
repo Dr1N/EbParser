@@ -19,7 +19,7 @@ namespace EbParser.Context
         public string Title { get; set; }
 
         [Required]
-        public DateTime Publish { get; set; }
+        public DateTimeOffset Publish { get; set; }
 
         [Required]
         public string Content { get; set; }

@@ -1,16 +1,23 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace EbParser
 {
     class Program
     {
+        private const string SaveFilesArg = "-f";
+        private const string TestRun = "-t";
+
         static void Main(string[] args)
         {
             try
             {
-                MainAsync(args).ConfigureAwait(false).GetAwaiter().GetResult();
+                MainAsync(args)
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
             }
             catch { }
 
@@ -21,14 +28,23 @@ namespace EbParser
         {
             var stopWatch = Stopwatch.StartNew();
 
-            using var worker = new Parser();
+            var saveFiles = args.Any(a => a == SaveFilesArg);
+            var test = args.Any(a => a == TestRun);
+
+            using var worker = new Parser(saveFiles, test);
             worker.PageChangded += Worker_PageChangded;
             worker.Error += Worker_Error;
+            worker.Report += Worker_Report;
             await worker.ParseAsync();
 
             Console.WriteLine($"Time: {stopWatch.Elapsed.TotalSeconds} sec");
         }
-        
+
+        private static void Worker_Report(object sender, string e)
+        {
+            Print($"Info: {e}");
+        }
+
         #region Callbacks
 
         private static void Worker_Error(object sender, string e)

@@ -158,7 +158,7 @@ namespace EbParser.Core
             return result;
         }
 
-        public async Task<string> FindParentAsync(string html, string selector, string parent = null) //TODO parent type
+        public async Task<string> FindParentAsync(string html, string selector, string parent = null)
         {
             if (string.IsNullOrEmpty(html))
             {

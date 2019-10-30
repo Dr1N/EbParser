@@ -9,6 +9,8 @@ namespace EbParser.Interfaces
 
         event EventHandler<string> Error;
 
+        event EventHandler<string> Report;
+
         Task ParseAsync();
     }
 }
