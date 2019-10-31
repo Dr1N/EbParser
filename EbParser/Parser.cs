@@ -173,17 +173,22 @@ namespace EbParser
             var stopWatch = Stopwatch.StartNew();
             var pageHtml = await _loader.LoadPageAsync(postUrl);
             RaiseReport($"Page loaded [{stopWatch.Elapsed.TotalMilliseconds}]");
+            stopWatch.Restart();
             var post = await GetPostDtoAsync(pageHtml);
             post.Url = postUrl;
             var comments = await GetPostCommentsAsync(pageHtml);
             RaiseReport($"Page parsed [{stopWatch.Elapsed.TotalMilliseconds}]");
+            stopWatch.Restart();
             await SaveToBaseAsync(post, comments);
             RaiseReport($"Post saved [{stopWatch.Elapsed.TotalMilliseconds}]");
+            stopWatch.Restart();
             if (_saveFiles == true)
             {
                 await SavePostFiles(post);
                 RaiseReport($"Files saved [{stopWatch.Elapsed.TotalMilliseconds}]");
+                stopWatch.Restart();
             }
+            stopWatch.Stop();
         }
 
         private async Task<IList<string>> GetPostLinksFromPageAsync(string pageUrl)
@@ -306,10 +311,17 @@ namespace EbParser
 
         private async Task SaveToBaseAsync(PostDto postDto, IList<CommentDto> commentDTOs)
         {
+            var stopWatch = Stopwatch.StartNew();
             using var db = new SiteContext();
             var tags = await ProcessTags(db, postDto.Tags);
+            RaiseReport($"Tags saved: [{stopWatch.Elapsed.TotalMilliseconds}]");
+            stopWatch.Restart();
             var post = await ProcessPost(db, postDto);
+            RaiseReport($"Post saved: [{stopWatch.Elapsed.TotalMilliseconds}]");
+            stopWatch.Restart();
             var comments = await ProcessComments(db, commentDTOs, post);
+            RaiseReport($"Comments saved: [{stopWatch.Elapsed.TotalMilliseconds}]");
+            stopWatch.Stop();
         }
 
         private async Task<IList<Tag>> ProcessTags(SiteContext db, IList<string> tags)

@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <None Update="eb.db">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
