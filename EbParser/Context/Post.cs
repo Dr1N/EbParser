@@ -10,13 +10,17 @@ namespace EbParser.Context
         [Key]
         public int Id { get; set; }
 
-        [StringLength(1024)]
         [Required]
+        [StringLength(1024)]
         public string Url { get; set; }
 
-        [StringLength(128)]
         [Required]
+        [StringLength(128)]
         public string Title { get; set; }
+
+        [Required]
+        [StringLength(256)]
+        public string Poster { get; set; }
 
         [Required]
         public DateTimeOffset Publish { get; set; }
@@ -31,9 +35,6 @@ namespace EbParser.Context
 
         [ForeignKey("PostId")]
         public ICollection<Comment> Comments { get; set; }
-
-        [ForeignKey("PostId")]
-        public ICollection<File> Files { get; set; }
 
         [Required]
         public DateTime Updated { get; set; }

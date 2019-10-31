@@ -61,13 +61,10 @@ namespace EbParser.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Path")
+                    b.Property<string>("FileName")
                         .IsRequired()
                         .HasColumnType("TEXT")
                         .HasMaxLength(128);
-
-                    b.Property<int>("PostId")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Url")
                         .IsRequired()
@@ -75,8 +72,6 @@ namespace EbParser.Migrations
                         .HasMaxLength(1024);
 
                     b.HasKey("Id");
-
-                    b.HasIndex("PostId");
 
                     b.ToTable("Files");
                 });
@@ -94,6 +89,11 @@ namespace EbParser.Migrations
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("Poster")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasMaxLength(256);
 
                     b.Property<DateTimeOffset>("Publish")
                         .HasColumnType("TEXT");
@@ -155,15 +155,6 @@ namespace EbParser.Migrations
 
                     b.HasOne("EbParser.Context.Post", "Post")
                         .WithMany("Comments")
-                        .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("EbParser.Context.File", b =>
-                {
-                    b.HasOne("EbParser.Context.Post", "Post")
-                        .WithMany("Files")
                         .HasForeignKey("PostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

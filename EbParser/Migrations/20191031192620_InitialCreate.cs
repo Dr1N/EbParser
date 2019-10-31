@@ -8,6 +8,20 @@ namespace EbParser.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "Files",
+                columns: table => new
+                {
+                    Id = table.Column<int>(nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Url = table.Column<string>(maxLength: 1024, nullable: false),
+                    FileName = table.Column<string>(maxLength: 128, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Files", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Posts",
                 columns: table => new
                 {
@@ -15,6 +29,7 @@ namespace EbParser.Migrations
                         .Annotation("Sqlite:Autoincrement", true),
                     Url = table.Column<string>(maxLength: 1024, nullable: false),
                     Title = table.Column<string>(maxLength: 128, nullable: false),
+                    Poster = table.Column<string>(maxLength: 256, nullable: false),
                     Publish = table.Column<DateTimeOffset>(nullable: false),
                     Content = table.Column<string>(nullable: false),
                     Category = table.Column<string>(maxLength: 32, nullable: true),
@@ -70,27 +85,6 @@ namespace EbParser.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Files",
-                columns: table => new
-                {
-                    Id = table.Column<int>(nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Url = table.Column<string>(maxLength: 1024, nullable: false),
-                    Path = table.Column<string>(maxLength: 128, nullable: false),
-                    PostId = table.Column<int>(nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Files", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Files_Posts_PostId",
-                        column: x => x.PostId,
-                        principalTable: "Posts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "PostTags",
                 columns: table => new
                 {
@@ -122,11 +116,6 @@ namespace EbParser.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_Comments_PostId",
                 table: "Comments",
-                column: "PostId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Files_PostId",
-                table: "Files",
                 column: "PostId");
 
             migrationBuilder.CreateIndex(

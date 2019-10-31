@@ -8,8 +8,8 @@ namespace EbParser.Context
         [Key]
         public int Id { get; set; }
 
-        [StringLength(64)]
         [Required]
+        [StringLength(64)]
         public string Name { get; set; }
 
         public ICollection<PostTag> PostTags { get; set; }

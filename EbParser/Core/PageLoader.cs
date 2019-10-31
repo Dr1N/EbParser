@@ -2,6 +2,7 @@
 using EbParser.Interfaces;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -82,6 +83,38 @@ namespace EbParser.Core
             catch (HttpRequestException httpex)
             {
                 HandleException(httpex);
+            }
+            catch (Exception ex)
+            {
+                HandleException(ex);
+            }
+
+            return result;
+        }
+
+        public async Task<bool> LoadFileAsync(string url, string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new ArgumentNullException(nameof(path));
+            }
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
+            {
+                throw new ArgumentException(nameof(url));
+            }
+
+            var result = false;
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                using var response = await _httpClient.SendAsync(request, CancellationToken.None);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var contentStream = await response.Content.ReadAsStreamAsync();
+                    using var fsStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+                    await contentStream.CopyToAsync(fsStream);
+                    result = true;
+                }
             }
             catch (Exception ex)
             {

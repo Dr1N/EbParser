@@ -6,6 +6,6 @@ namespace EbParser.Interfaces
     {
         Task<string> LoadPageAsync(string url);
 
-        //Task<bool> LoadFileAsync(string url, string path); // TODO
+        Task<bool> LoadFileAsync(string url, string path);
     }
 }

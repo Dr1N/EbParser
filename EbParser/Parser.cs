@@ -4,6 +4,8 @@ using EbParser.DTO;
 using EbParser.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -15,6 +17,7 @@ namespace EbParser
 
         private const string Site = "https://ebanoe.it";
         private const string Pattern = "https://ebanoe.it/page/{0}/";
+        private const string FileDirectory = "files";
 
         #endregion
 
@@ -99,7 +102,7 @@ namespace EbParser
 
         private async Task<int> ParsePagesCount()
         {
-            var site = await _loader.LoadPageAsync(Site);
+            var site = await _loader.LoadPageAsync(string.Format(Pattern, 0));
             var pages = await _parser.ParseHtmlAsync(site, EbSelectors.PagesSelector);
             var last = pages.Last();
             var result = await _parser.ParseTextAsync(last, "a");
@@ -109,26 +112,55 @@ namespace EbParser
 
         private async Task ParseSiteAsync()
         {
-            var p = await ParsePagesCount();
-
-            var pageUrl = string.Format(Pattern, 1);
-            RaisePage(new Uri(pageUrl));
             try
             {
-                var linkTags = await GetPostLinksFromPageAsync(pageUrl);
-                RaiseReport($"Find: {linkTags.Count} posts");
-                foreach (var linkTag in linkTags)
+                RaiseReport("START");
+                var pages = await ParsePagesCount();
+                RaiseReport($"Pages: {pages}");
+                var lastUrl = GetLastPostUrl();
+                RaiseReport($"Last: {lastUrl}");
+                var isEnd = false;
+                for (int i = 0; i <= pages; i++)
                 {
                     try
                     {
-                        await ParsePostAsync(linkTag);
-                        break;
+                        if (i == 1) continue; // Skip first page
+                        var pageUrl = string.Format(Pattern, i);
+                        RaiseReport(new string('-', 40));
+                        RaisePage(new Uri(pageUrl));
+                        RaiseReport(new string('-', 40));
+                        var linkTags = await GetPostLinksFromPageAsync(pageUrl);
+                        RaiseReport($"Find: {linkTags.Count} posts");
+                        foreach (var linkTag in linkTags)
+                        {
+                            try
+                            {
+                                var postUrl = await _parser.ParseAttributeAsync(linkTag, "a", "href");
+                                RaisePage(new Uri(postUrl));
+                                if (postUrl == lastUrl)
+                                {
+                                    isEnd = true;
+                                    break;
+                                }
+                                await ParsePostAsync(postUrl);
+                                RaiseReport(new string('-', 40));
+                            }
+                            catch (Exception ex)
+                            {
+                                RaiseError(ex.Message);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
                         RaiseError(ex.Message);
                     }
+                    if (isEnd)
+                    {
+                        break;
+                    }
                 }
+                RaiseReport("DONE!");
             }
             catch (Exception ex)
             {
@@ -136,19 +168,22 @@ namespace EbParser
             }
         }
 
-        private async Task ParsePostAsync(string linkTag)
+        private async Task ParsePostAsync(string postUrl)
         {
-            var postLink = await _parser.ParseAttributeAsync(linkTag, "a", "href");
-            RaisePage(new Uri(postLink));
-            var pageHtml = await _loader.LoadPageAsync((string)postLink);
-            RaiseReport("Page loaded...");
+            var stopWatch = Stopwatch.StartNew();
+            var pageHtml = await _loader.LoadPageAsync(postUrl);
+            RaiseReport($"Page loaded [{stopWatch.Elapsed.TotalMilliseconds}]");
             var post = await GetPostDtoAsync(pageHtml);
-            post.Url = postLink;
+            post.Url = postUrl;
             var comments = await GetPostCommentsAsync(pageHtml);
-            RaiseReport("Page parsed...");
+            RaiseReport($"Page parsed [{stopWatch.Elapsed.TotalMilliseconds}]");
             await SaveToBaseAsync(post, comments);
-            RaiseReport("Saved post");
-            //TODO: Save Files
+            RaiseReport($"Post saved [{stopWatch.Elapsed.TotalMilliseconds}]");
+            if (_saveFiles == true)
+            {
+                await SavePostFiles(post);
+                RaiseReport($"Files saved [{stopWatch.Elapsed.TotalMilliseconds}]");
+            }
         }
 
         private async Task<IList<string>> GetPostLinksFromPageAsync(string pageUrl)
@@ -244,18 +279,23 @@ namespace EbParser
             };
         }
 
-        private DateTime ParseCommentPublishTime(string publish)
-        {
-            var dateTimeStr = publish.Replace("в", "");
-            var result = DateTime.Parse(string.Join(' ', dateTimeStr));
-
-            return result;
-        }
-
         private async Task<string> GetCommentParent(string container, int id)
         {
             var selector = string.Format(EbSelectors.PostCommentParentPattern, id);
             var result = await _parser.FindParentAsync(container, selector, "li");
+
+            return result;
+        }
+
+        private async Task<IList<string>> GetPostFiles(string content)
+        {
+            var result = new List<string>();
+            var images = await _parser.ParseHtmlAsync(content, "img");
+            foreach (var image in images)
+            {
+                var src = await _parser.ParseAttributeAsync(image, "img", "src");
+                result.Add(src);
+            }
 
             return result;
         }
@@ -294,6 +334,7 @@ namespace EbParser
                 Url = postDto.Url,
                 Title = postDto.Title,
                 Publish = postDto.Publish,
+                Poster = postDto.Poster,
                 Content = postDto.Content,
                 Category = postDto.Category,
                 Updated = DateTime.Now,
@@ -358,9 +399,117 @@ namespace EbParser
             }
         }
 
+        private async Task SavePostFiles(PostDto post)
+        {
+            var postFiles = new List<string>() { post.Poster };
+            postFiles.AddRange(await GetPostFiles(post.Content));
+            foreach (var fileSrc in postFiles)
+            {
+                var name = await SaveSiteFile(fileSrc);
+                if (!string.IsNullOrEmpty(name))
+                {
+                    var file = new Context.File()
+                    {
+                        Url = fileSrc,
+                        FileName = name,
+                    };
+                    using var context = new SiteContext();
+                    context.Files.Add(file);
+                    await context.SaveChangesAsync();
+                }
+            }
+        }
+
+        private async Task<string> SaveSiteFile(string url)
+        {
+            string result = null;
+
+            if (!url.StartsWith(Site))
+            {
+                return result;
+            }
+            var fileName = url.Split('/').LastOrDefault();
+            if (string.IsNullOrEmpty(fileName))
+            {
+                return result;
+            }
+
+            if (FileExists(url))
+            {
+                return result;
+            }
+
+            var directory = CreateFilesDirecory();
+            var ext = Path.GetExtension(fileName);
+            var newName = Path.Combine(directory, Guid.NewGuid().ToString() + ext);
+            await _loader.LoadFileAsync(url, newName);
+            result = newName;
+
+            return result;
+        }
+
         #endregion
 
         #region Helpers
+
+        private DateTime ParseCommentPublishTime(string publish)
+        {
+            var dateTimeStr = publish.Replace("в", "");
+            var result = DateTime.Parse(string.Join(' ', dateTimeStr));
+
+            return result;
+        }
+
+        private string GetLastPostUrl()
+        {
+            var result = string.Empty;
+            try
+            {
+                using var context = new SiteContext();
+                var lastPost = context.Posts
+                    .ToList()
+                    .OrderBy(p => p.Publish.ToUnixTimeSeconds())
+                    .LastOrDefault();
+                if (lastPost != null)
+                {
+                    result = lastPost.Url;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"{ex.Message}");
+            }
+
+            return result;
+        }
+
+        private bool FileExists(string url)
+        {
+            var result = false;
+
+            using var context = new SiteContext();
+            var inDb = context.Files.FirstOrDefault(f => f.Url == url);
+            if (inDb != null)
+            {
+                var path = Path.Combine(FileDirectory, inDb.FileName);
+                var inDirectory = System.IO.File.Exists(path);
+
+                result = inDirectory;
+            }
+
+            return result;
+        }
+
+        private string CreateFilesDirecory()
+        {
+            if (!Directory.Exists(FileDirectory))
+            {
+                Directory.CreateDirectory(FileDirectory);
+            }
+            var dirInfo = new DirectoryInfo(FileDirectory);
+
+            return dirInfo.FullName;
+        }
 
         private void RaisePage(Uri url)
         {
