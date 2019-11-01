@@ -150,6 +150,7 @@ namespace EbParser
                                 RaiseError(ex.Message);
                             }
                         }
+                        break;
                     }
                     catch (Exception ex)
                     {
@@ -180,7 +181,7 @@ namespace EbParser
             RaiseReport($"Page parsed [{stopWatch.Elapsed.TotalMilliseconds}]");
             stopWatch.Restart();
             await SaveToBaseAsync(post, comments);
-            RaiseReport($"Post saved [{stopWatch.Elapsed.TotalMilliseconds}]");
+            RaiseReport($"Base saved [{stopWatch.Elapsed.TotalMilliseconds}]");
             stopWatch.Restart();
             if (_saveFiles == true)
             {
