@@ -24,9 +24,9 @@ namespace EbParser
         #region Fields
 
         private readonly bool _saveFiles;
-        private readonly bool _test;
         private readonly IPageLoader _loader;
         private readonly IHtmlParser _parser;
+        private readonly SiteContext _db;
 
         #endregion
 
@@ -40,12 +40,12 @@ namespace EbParser
 
         #region Life
 
-        public Parser(bool saveFiles, bool test = false)
+        public Parser(bool saveFiles)
         {
+            _db = new SiteContext();
             _loader = new PageLoader();
             _parser = new AngelParser();
             _saveFiles = saveFiles;
-            _test = test;
         }
 
         #region IDisposable Support
@@ -60,6 +60,7 @@ namespace EbParser
                 {
                     (_loader as IDisposable)?.Dispose();
                     (_parser as IDisposable)?.Dispose();
+                    _db.Dispose();
                 }
 
                 disposedValue = true;
@@ -79,24 +80,12 @@ namespace EbParser
 
         public async Task ParseAsync()
         {
-            if (_test)
-            {
-                await TestAsync();
-                return;
-            }
-
             await ParseSiteAsync();
         }
 
         #endregion
 
         #region Private
-
-        private async Task TestAsync()
-        {
-            await Task.Delay(100);
-            Console.WriteLine("Hello test");
-        }
 
         #region Parsing
 

@@ -8,7 +8,6 @@ namespace EbParser
     class Program
     {
         private const string SaveFilesArg = "-f";
-        private const string TestRun = "-t";
 
         static void Main(string[] args)
         {
@@ -29,9 +28,8 @@ namespace EbParser
             var stopWatch = Stopwatch.StartNew();
 
             var saveFiles = args.Any(a => a == SaveFilesArg);
-            var test = args.Any(a => a == TestRun);
 
-            using var worker = new Parser(saveFiles, test);
+            using var worker = new Parser(saveFiles);
             worker.PageChangded += Worker_PageChangded;
             worker.Error += Worker_Error;
             worker.Report += Worker_Report;
