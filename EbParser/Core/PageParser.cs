@@ -12,7 +12,11 @@ namespace EbParser.Core
 {
     class AngelParser : IHtmlParser, IDisposable
     {
+        #region Fields
+
         private readonly IBrowsingContext _browsingContext;
+        
+        #endregion
 
         #region Life
 
@@ -153,53 +157,6 @@ namespace EbParser.Core
             catch (Exception ex)
             {
                 HandleException(ex);
-            }
-
-            return result;
-        }
-
-        public async Task<string> FindParentAsync(string html, string selector, string parent = null)
-        {
-            if (string.IsNullOrEmpty(html))
-            {
-                throw new ArgumentNullException(nameof(html));
-            }
-
-            string result = null;
-            var document = await _browsingContext.OpenAsync(req => req.Content(html));
-            if (document != null && document.All.Any())
-            {
-                var element = document.QuerySelector(selector);
-                if (element != null)
-                {
-                    var parentElement = element.ParentElement;
-                    while (true)
-                    {
-                        if (parentElement == null 
-                            || string.Compare(parentElement.TagName, "body") == 0
-                            || string.Compare(parentElement.TagName, "html") == 0)
-                        {
-                            break;
-                        }
-                        if (!string.IsNullOrEmpty(parent))
-                        {
-                            if (string.Compare(parentElement.TagName, parent, StringComparison.OrdinalIgnoreCase) == 0)
-                            {
-                                result = parentElement.OuterHtml;
-                                break;
-                            }
-                            else
-                            {
-                                parentElement = parentElement.ParentElement;
-                            }
-                        }
-                        else
-                        {
-                            result = element?.ParentElement.OuterHtml;
-                            break;
-                        }
-                    }
-                }
             }
 
             return result;

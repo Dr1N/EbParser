@@ -89,25 +89,15 @@ namespace EbParser
 
         #region Parsing
 
-        private async Task<int> ParsePagesCount()
-        {
-            var site = await _loader.LoadPageAsync(string.Format(Pattern, 0));
-            var pages = await _parser.ParseHtmlAsync(site, EbSelectors.PagesSelector);
-            var last = pages.Last();
-            var result = await _parser.ParseTextAsync(last, "a");
-
-            return int.Parse(result);
-        }
-
         private async Task ParseSiteAsync()
         {
             try
             {
                 RaiseReport("START");
                 var pages = await ParsePagesCount();
-                RaiseReport($"Pages: {pages}");
+                RaiseReport($"Pages: { pages }");
                 var lastUrl = GetLastPostUrl();
-                RaiseReport($"Last: {lastUrl}");
+                RaiseReport($"Last: { lastUrl }");
                 var isEnd = false;
                 for (int i = 0; i <= pages; i++)
                 {
@@ -119,7 +109,7 @@ namespace EbParser
                         RaisePage(new Uri(pageUrl));
                         RaiseReport(new string('-', 40));
                         var linkTags = await GetPostLinksFromPageAsync(pageUrl);
-                        RaiseReport($"Find: {linkTags.Count} posts");
+                        RaiseReport($"Find: { linkTags.Count } posts");
                         foreach (var linkTag in linkTags)
                         {
                             try
@@ -139,7 +129,7 @@ namespace EbParser
                                 RaiseError(ex.Message);
                             }
                         }
-                        break;
+                        break; // TODO: debug
                     }
                     catch (Exception ex)
                     {
@@ -158,25 +148,46 @@ namespace EbParser
             }
         }
 
+        private async Task<int> ParsePagesCount()
+        {
+            var site = await _loader.LoadPageAsync(string.Format(Pattern, 0));
+            var pages = await _parser.ParseHtmlAsync(site, EbSelectors.PagesSelector);
+            var last = pages.Last();
+            var result = await _parser.ParseTextAsync(last, "a");
+
+            return int.Parse(result);
+        }
+
         private async Task ParsePostAsync(string postUrl)
         {
             var stopWatch = Stopwatch.StartNew();
+
+            // Load page
+
             var pageHtml = await _loader.LoadPageAsync(postUrl);
-            RaiseReport($"Page loaded [{stopWatch.Elapsed.TotalMilliseconds}]");
+            RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");
             stopWatch.Restart();
-            var post = await GetPostDtoAsync(pageHtml);
+
+            // Parse page
+
+            using var pageParser = new PostParser(pageHtml);
+            var post = await pageParser.GetPostDtoAsync();
             post.Url = postUrl;
-            var comments = await GetPostCommentsAsync(pageHtml);
-            RaiseReport($"Page parsed [{stopWatch.Elapsed.TotalMilliseconds}]");
+            var comments = await pageParser.GetPostCommentsAsync();
+            RaiseReport($"Page parsed: [{ stopWatch.Elapsed.TotalMilliseconds }]");
             stopWatch.Restart();
-            await SaveToBaseAsync(post, comments);
-            RaiseReport($"Base saved [{stopWatch.Elapsed.TotalMilliseconds}]");
+            
+            // Save page
+
+            await AddToBaseAsync(post, comments);
+            RaiseReport($"Page saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
             stopWatch.Restart();
             if (_saveFiles == true)
             {
-                await SavePostFiles(post);
-                RaiseReport($"Files saved [{stopWatch.Elapsed.TotalMilliseconds}]");
-                stopWatch.Restart();
+                var files = new List<string>() { post.Poster };
+                files.AddRange(await pageParser.GetPostFilesAsync());
+                await SavePostFiles(files);
+                RaiseReport($"Files saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
             }
             stopWatch.Stop();
         }
@@ -189,147 +200,42 @@ namespace EbParser
             return postTitles;
         }
 
-        private async Task<PostDto> GetPostDtoAsync(string pageHtml)
-        {
-            var result = new PostDto();
-            var title = await _parser.ParseTextAsync(pageHtml, EbSelectors.PostTitleSelector);
-            var author = await _parser.ParseTextAsync(pageHtml, EbSelectors.PostAuthorSelector);
-            var dateTime = await _parser.ParseAttributeAsync(pageHtml, EbSelectors.PostTimeSelector, "datetime");
-            var poster = await _parser.ParseAttributeAsync(pageHtml, EbSelectors.PostPosterSelector, "src");
-            var content = (await _parser.ParseHtmlAsync(pageHtml, EbSelectors.PostContentSelector)).FirstOrDefault();
-            var category = await _parser.ParseTextAsync(pageHtml, EbSelectors.PostCategorytSelector);
-            var tags = await GetPostTagsAsync(pageHtml);
-
-            result.Title = title;
-            result.Author = author;
-            result.Publish = DateTimeOffset.Parse(dateTime).DateTime;
-            result.Poster = poster;
-            result.Content = content;
-            result.Category = category;
-            result.Tags = tags;
-
-            return result;
-        }
-
-        private async Task<IList<string>> GetPostTagsAsync(string pageHtml)
-        {
-            var result = new List<string>();
-
-            var tags = await _parser.ParseHtmlAsync(pageHtml, EbSelectors.PostTagstSelector);
-            foreach (var tag in tags)
-            {
-                var tagName = await _parser.ParseTextAsync(tag, "a");
-                result.Add(tagName);
-            }
-
-            RaiseReport($"Find tags: {result.Count}");
-
-            return result;
-        }
-
-        private async Task<IList<CommentDto>> GetPostCommentsAsync(string pageHtml)
-        {
-            var result = new List<CommentDto>();
-
-            var commentContainer = (await _parser.ParseHtmlAsync(pageHtml, EbSelectors.PostCommentContainerSelector)).FirstOrDefault();
-            var commentsList = await _parser.ParseHtmlAsync(pageHtml, EbSelectors.PostCommentListSelector);
-            
-            // Find comments
-            
-            foreach (var comment in commentsList)
-            {
-                result.Add(await GetCommentFromItemAsync(comment));
-            }
-
-            // Find parents for comments
-
-            foreach (var item in result)
-            {
-                var parent = await GetCommentParent(commentContainer, item.Id);
-                if (parent != null)
-                {
-                    var parentId = await _parser.ParseAttributeAsync(parent, EbSelectors.PostCommentIdSelector, "id");
-                    item.ParrentId = int.Parse(parentId.Split('-').Last());
-                }
-            }
-
-            RaiseReport($"Find comments: {result.Count}");
-
-            return result;
-        }
-
-        private async Task<CommentDto> GetCommentFromItemAsync(string commentItemHtml)
-        {
-            var id = await _parser.ParseAttributeAsync(commentItemHtml, EbSelectors.PostCommentIdSelector, "id");
-            var author = await _parser.ParseTextAsync(commentItemHtml, EbSelectors.PostCommentAuthorSelector);
-            var publish = await _parser.ParseTextAsync(commentItemHtml, EbSelectors.PostCommentDateSelector);
-            var content = await _parser.ParseTextAsync(commentItemHtml, EbSelectors.PostCommentContentSelector);
-
-            return new CommentDto()
-            {
-                Id = int.Parse(id.Split('-').Last()),
-                Author = author,
-                Publish = ParseCommentPublishTime(publish),
-                Content = content,
-            };
-        }
-
-        private async Task<string> GetCommentParent(string container, int id)
-        {
-            var selector = string.Format(EbSelectors.PostCommentParentPattern, id);
-            var result = await _parser.FindParentAsync(container, selector, "li");
-
-            return result;
-        }
-
-        private async Task<IList<string>> GetPostFiles(string content)
-        {
-            var result = new List<string>();
-            var images = await _parser.ParseHtmlAsync(content, "img");
-            foreach (var image in images)
-            {
-                var src = await _parser.ParseAttributeAsync(image, "img", "src");
-                result.Add(src);
-            }
-
-            return result;
-        }
-
         #endregion
 
         #region Saving
 
-        private async Task SaveToBaseAsync(PostDto postDto, IList<CommentDto> commentDTOs)
+        private async Task AddToBaseAsync(PostDto postDto, IList<CommentDto> commentDTOs)
         {
             var stopWatch = Stopwatch.StartNew();
-            using var db = new SiteContext();
-            var tags = await ProcessTags(db, postDto.Tags);
-            RaiseReport($"Tags saved: [{stopWatch.Elapsed.TotalMilliseconds}]");
+            var tags = ProcessTags(postDto.Tags);
+            RaiseReport($"Tags saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
             stopWatch.Restart();
-            var post = await ProcessPost(db, postDto);
-            RaiseReport($"Post saved: [{stopWatch.Elapsed.TotalMilliseconds}]");
+            var post = await ProcessPost(postDto);
+            RaiseReport($"Post saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
             stopWatch.Restart();
-            var comments = await ProcessComments(db, commentDTOs, post);
-            RaiseReport($"Comments saved: [{stopWatch.Elapsed.TotalMilliseconds}]");
+            await ProcessComments(commentDTOs, post);
+            RaiseReport($"Comments saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
             stopWatch.Stop();
         }
 
-        private async Task<IList<Tag>> ProcessTags(SiteContext db, IList<string> tags)
+        private IList<Tag> ProcessTags(IList<string> tags)
         {
-            foreach (var tag in tags)
+            foreach (var tagName in tags)
             {
-                var dbTag = db.Tags.FirstOrDefault(t => t.Name == tag);
+                var dbTag = _db.Tags.FirstOrDefault(t => t.Name == tagName);
                 if (dbTag == null)
                 {
-                    db.Tags.Add(new Tag() { Name = tag });
+                    var tagModel = new Tag() { Name = tagName };
+                    _db.Tags.Add(tagModel);
                 }
             }
-            await db.SaveChangesAsync();
 
-            return db.Tags.ToList();
+            _db.SaveChangesAsync();
+
+            return _db.Tags.ToList();
         }
 
-        private async Task<Post> ProcessPost(SiteContext db, PostDto postDto)
+        private async Task<Post> ProcessPost(PostDto postDto)
         {
             var post = new Post()
             {
@@ -343,42 +249,46 @@ namespace EbParser
             };
             foreach (var tag in postDto.Tags)
             {
-                var dbTag = db.Tags.FirstOrDefault(t => t.Name == tag);
+                var dbTag = _db.Tags.FirstOrDefault(t => t.Name == tag);
                 var postTag = new PostTag() { Post = post, Tag = dbTag };
-                db.PostTags.Add(postTag);
+                _db.PostTags.Add(postTag);
             }
-            db.Posts.Add(post);
-            await db.SaveChangesAsync();
+            //await _db.SaveChangesAsync();
+            _db.Posts.Add(post);
+            await _db.SaveChangesAsync();
 
             return post;
         }
 
-        private async Task<IList<Comment>> ProcessComments(SiteContext db, IList<CommentDto> comments, Post post)
+        private async Task<IList<Comment>> ProcessComments(IList<CommentDto> comments, Post post)
         {
-            var firstLevelComments = comments.Where(c => c.ParrentId == 0).ToList();
+            var firstLevelComments = comments
+                .Where(c => c.ParrentId == 0)
+                .ToList();
             foreach (var comment in firstLevelComments)
             {
                 var dbComment = new Comment()
                 {
                     Author = comment.Author,
                     Publish = comment.Publish,
-                    PostId = post.Id,
+                    Post = post,
                     Content = comment.Content,
                     ParentId = null,
                     Updated = DateTime.Now,
                 };
-                db.Comments.Add(dbComment);
-                await db.SaveChangesAsync();
+                _db.Comments.Add(dbComment);
 
-                await SaveChildComments(db, comments, comment, dbComment.Id, post.Id);
+                await ProcessChildComments(comments, comment, dbComment.Id, post);
             }
 
-            return db.Comments.ToList();
+            return _db.Comments.ToList();
         }
 
-        private async Task SaveChildComments(SiteContext db, IList<CommentDto> allComments, CommentDto parent, int parentId, int postId)
+        private async Task ProcessChildComments(IList<CommentDto> allComments, CommentDto parent, int parentId, Post post)
         {
-            var children = allComments.Where(c => c.ParrentId == parent.Id).ToList();
+            var children = allComments
+                .Where(c => c.ParrentId == parent.Id)
+                .ToList();
             if (children.Count == 0)
             {
                 return;
@@ -389,23 +299,20 @@ namespace EbParser
                 {
                     Author = child.Author,
                     Publish = child.Publish,
-                    PostId = postId,
+                    Post = post,
                     Content = child.Content,
                     ParentId = parentId,
                     Updated = DateTime.Now,
                 };
-                db.Comments.Add(dbComment);
-                await db.SaveChangesAsync();
+                _db.Comments.Add(dbComment);
 
-                await SaveChildComments(db, allComments, child, dbComment.Id, postId);
+                await ProcessChildComments(allComments, child, dbComment.Id, post);
             }
         }
 
-        private async Task SavePostFiles(PostDto post)
+        private async Task SavePostFiles(IList<string> files)
         {
-            var postFiles = new List<string>() { post.Poster };
-            postFiles.AddRange(await GetPostFiles(post.Content));
-            foreach (var fileSrc in postFiles)
+            foreach (var fileSrc in files)
             {
                 var name = await SaveSiteFile(fileSrc);
                 if (!string.IsNullOrEmpty(name))
@@ -415,11 +322,10 @@ namespace EbParser
                         Url = fileSrc,
                         FileName = name,
                     };
-                    using var context = new SiteContext();
-                    context.Files.Add(file);
-                    await context.SaveChangesAsync();
+                    _db.Files.Add(file);
                 }
             }
+            await _db.SaveChangesAsync();
         }
 
         private async Task<string> SaveSiteFile(string url)
@@ -454,21 +360,12 @@ namespace EbParser
 
         #region Helpers
 
-        private DateTime ParseCommentPublishTime(string publish)
-        {
-            var dateTimeStr = publish.Replace("в", "");
-            var result = DateTime.Parse(string.Join(' ', dateTimeStr));
-
-            return result;
-        }
-
         private string GetLastPostUrl()
         {
             var result = string.Empty;
             try
             {
-                using var context = new SiteContext();
-                var lastPost = context.Posts
+                var lastPost = _db.Posts
                     .ToList()
                     .OrderBy(p => p.Publish.ToUnixTimeSeconds())
                     .LastOrDefault();
@@ -489,8 +386,7 @@ namespace EbParser
         {
             var result = false;
 
-            using var context = new SiteContext();
-            var inDb = context.Files.FirstOrDefault(f => f.Url == url);
+            var inDb = _db.Files.FirstOrDefault(f => f.Url == url);
             if (inDb != null)
             {
                 var path = Path.Combine(FileDirectory, inDb.FileName);

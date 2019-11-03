@@ -1,6 +1,5 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EbParser.Context
 {
@@ -17,7 +16,6 @@ namespace EbParser.Context
         public DateTime Publish { get; set; }
 
         [Required]
-        [ForeignKey("Post")]
         public int PostId { get; set; }
 
         public Post Post { get; set; }

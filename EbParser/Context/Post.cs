@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EbParser.Context
 {
@@ -33,7 +32,6 @@ namespace EbParser.Context
 
         public ICollection<PostTag> PostTags { get; set; }
 
-        [ForeignKey("PostId")]
         public ICollection<Comment> Comments { get; set; }
 
         [Required]
