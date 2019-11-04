@@ -1,12 +1,8 @@
-﻿using EbParser.Context;
-using EbParser.Core;
-using EbParser.DTO;
+﻿using EbParser.Core;
 using EbParser.Interfaces;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -17,18 +13,16 @@ namespace EbParser
     {
         #region Constants
 
-        private const string Site = "https://ebanoe.it";
         private const string Pattern = "https://ebanoe.it/page/{0}/";
-        private const string FileDirectory = "files";
 
         #endregion
 
         #region Fields
 
-        private readonly bool _saveFiles;
         private readonly IPageLoader _loader;
         private readonly IHtmlParser _parser;
-        private readonly SiteContext _db;
+        private readonly IPostStorage _storage;
+        private readonly bool _saveFiles;
 
         #endregion
 
@@ -44,9 +38,9 @@ namespace EbParser
 
         public Parser(bool saveFiles)
         {
-            _db = new SiteContext();
             _loader = new PageLoader();
             _parser = new AngelParser();
+            _storage = new PostStorage(_loader);
             _saveFiles = saveFiles;
         }
 
@@ -62,7 +56,7 @@ namespace EbParser
                 {
                     (_loader as IDisposable)?.Dispose();
                     (_parser as IDisposable)?.Dispose();
-                    _db.Dispose();
+                    (_storage as IDisposable)?.Dispose();
                 }
 
                 disposedValue = true;
@@ -98,7 +92,7 @@ namespace EbParser
                 RaiseReport("START");
                 var pages = await ParsePagesCountAsync();
                 RaiseReport($"Pages: { pages }");
-                var lastUrl = GetLastPostUrl();
+                var lastUrl = _storage.GetLastPostUrl();
                 RaiseReport($"Last: { lastUrl }");
                 var isEnd = false;
                 for (int i = 0; i <= pages; i++)
@@ -130,24 +124,27 @@ namespace EbParser
                                 stopWatch.Restart();
                                 using var postParser = new PostParser(html);
                                 var postDto = await postParser.GetPostDtoAsync();
-                                await SaveTagsAsync(postDto.Tags);
-                                var postModel = await SavePostAsync(postDto, postUrl);
+                                await _storage.SaveTagsAsync(postDto.Tags);
+                                var postModel = await _storage.SavePostAsync(postDto, postUrl);
                                 RaiseReport($"Page saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
                                 stopWatch.Restart();
                                 var commentDto = await postParser.GetPostCommentsAsync();
-                                await SaveCommentsAsync(commentDto, postModel);
+                                await _storage.SaveCommentsAsync(commentDto, postModel);
                                 RaiseReport($"Comments saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
                                 var files = await postParser.GetPostFilesAsync();
                                 stopWatch.Restart();
-                                await SavePostFilesAsync(files);
-                                RaiseReport($"Fies saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
+                                if (_saveFiles)
+                                {
+                                    await _storage.SavePostFilesAsync(files);
+                                    RaiseReport($"Fies saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
+                                }
                             }
                             catch (Exception ex)
                             {
                                 RaiseError(ex.Message);
                             }
                         }
-                        break; // TODO: debug
+                        //break; // TODO: debug
                     }
                     catch (Exception ex)
                     {
@@ -197,29 +194,6 @@ namespace EbParser
             return result;
         }
 
-        private async Task<bool> LoadFileAsync(string url, string newName)
-        {
-            var result = false;
-            for (int i = 0; i < 3; i++)
-            {
-                try
-                {
-                    result = await _loader.LoadFileAsync(url, newName);
-                }
-                catch (HttpRequestException ex)
-                {
-                    RaiseError(ex.Message);
-                    await Task.Delay(TimeSpan.FromSeconds(5 + i));
-                }
-                catch (Exception ex)
-                {
-                    RaiseError(ex.Message);
-                }
-            }
-
-            return result;
-        }
-
         private async Task<IList<string>> GetPostLinksFromPageAsync(string pageUrl)
         {
             var content = await LoadPageAsync(pageUrl);
@@ -230,187 +204,7 @@ namespace EbParser
 
         #endregion
 
-        #region Saving
-
-        private async Task<IList<Tag>> SaveTagsAsync(IList<string> tags)
-        {
-            foreach (var tagName in tags)
-            {
-                var dbTag = _db.Tags.FirstOrDefault(t => t.Name == tagName);
-                if (dbTag == null)
-                {
-                    _db.Tags.Add(new Tag() { Name = tagName });
-                }
-            }
-            await _db.SaveChangesAsync();
-
-            return _db.Tags.ToList();
-        }
-
-        private async Task<Post> SavePostAsync(PostDto postDto, string url)
-        {
-            var post = new Post()
-            {
-                Url = url,
-                Title = postDto.Title,
-                Publish = postDto.Publish,
-                Poster = postDto.Poster,
-                Content = postDto.Content,
-                Category = postDto.Category,
-                Updated = DateTime.Now,
-            };
-            foreach (var tag in postDto.Tags)
-            {
-                var dbTag = _db.Tags.FirstOrDefault(t => t.Name == tag);
-                var postTag = new PostTag() { Post = post, Tag = dbTag };
-                _db.PostTags.Add(postTag);
-            }
-            _db.Posts.Add(post);
-            await _db.SaveChangesAsync();
-
-            return post;
-        }
-
-        private async Task<IList<Comment>> SaveCommentsAsync(IList<CommentDto> comments, Post post)
-        {
-            var firstLevelComments = comments
-                .Where(c => c.ParrentId == 0)
-                .ToList();
-            foreach (var comment in firstLevelComments)
-            {
-                var dbComment = new Comment()
-                {
-                    Author = comment.Author,
-                    Publish = comment.Publish,
-                    Post = post,
-                    Content = comment.Content,
-                    Parent = null,
-                    Updated = DateTime.Now,
-                };
-                _db.Comments.Add(dbComment);
-                await SaveChildCommentsAsync(comments, comment, dbComment, post);
-            }
-            await _db.SaveChangesAsync();
-
-            return _db.Comments.ToList();
-        }
-
-        private async Task SaveChildCommentsAsync(IList<CommentDto> allComments, CommentDto parent, Comment parentModel, Post post)
-        {
-            var children = allComments
-                .Where(c => c.ParrentId == parent.Id)
-                .ToList();
-            if (children.Count == 0)
-            {
-                return;
-            }
-
-            foreach (var child in children)
-            {
-                var dbComment = new Comment()
-                {
-                    Author = child.Author,
-                    Publish = child.Publish,
-                    Post = post,
-                    Content = child.Content,
-                    Parent = parentModel,
-                    Updated = DateTime.Now,
-                };
-                _db.Comments.Add(dbComment);
-                await SaveChildCommentsAsync(allComments, child, dbComment, post);
-            }
-        }
-
-        private async Task<IList<Context.File>> SavePostFilesAsync(IList<string> files)
-        {
-            if (_saveFiles)
-            {
-                var tasks = new List<Task>();
-                var bag = new ConcurrentBag<Context.File>();
-                foreach (var fileSrc in files)
-                {
-                    var task = Task.Run(async () => 
-                    {
-                        var name = await SaveSiteFileAsync(fileSrc);
-                        if (!string.IsNullOrEmpty(name))
-                        {
-                            var file = new Context.File()
-                            {
-                                Url = fileSrc,
-                                FileName = name,
-                            };
-                            bag.Add(file);
-                        }
-                    });
-                    tasks.Add(task);
-                }
-                Task.WaitAll(tasks.ToArray());
-                _db.Files.AddRange(bag);
-                await _db.SaveChangesAsync();
-            }
-
-            return _db.Files.ToList();
-        }
-
-        private async Task<string> SaveSiteFileAsync(string url)
-        {
-            string result = null;
-
-            if (!url.StartsWith(Site))
-            {
-                return result;
-            }
-            var fileName = url.Split('/').LastOrDefault();
-            if (string.IsNullOrEmpty(fileName))
-            {
-                return result;
-            }
-
-            var directory = CreateFilesDirecory();
-            var ext = Path.GetExtension(fileName);
-            var newName = Path.Combine(directory, Guid.NewGuid().ToString() + ext);
-            await LoadFileAsync(url, newName);
-            result = newName;
-
-            return result;
-        }
-
-        #endregion
-
         #region Helpers
-
-        private string GetLastPostUrl()
-        {
-            var result = string.Empty;
-            try
-            {
-                var lastPost = _db.Posts
-                    .ToList()
-                    .OrderBy(p => p.Publish.ToUnixTimeSeconds())
-                    .LastOrDefault();
-                if (lastPost != null)
-                {
-                    result = lastPost.Url;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"{ex.Message}");
-            }
-
-            return result;
-        }
-
-        private string CreateFilesDirecory()
-        {
-            if (!Directory.Exists(FileDirectory))
-            {
-                Directory.CreateDirectory(FileDirectory);
-            }
-            var dirInfo = new DirectoryInfo(FileDirectory);
-
-            return dirInfo.FullName;
-        }
 
         private void RaisePage(Uri url)
         {
