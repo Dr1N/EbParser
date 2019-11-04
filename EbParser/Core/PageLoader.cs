@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace EbParser.Core
 {
-    class PageLoader : IPageLoader, IDisposable
+    class PageLoader : ILoader, IDisposable
     {
         #region Fields
 

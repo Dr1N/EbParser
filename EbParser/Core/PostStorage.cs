@@ -22,14 +22,14 @@ namespace EbParser.Core
 
         #region Fields
 
-        private readonly IPageLoader _loader;
+        private readonly ILoader _loader;
         private readonly SiteContext _db;
 
         #endregion
 
         #region Life
 
-        public PostStorage(IPageLoader loader)
+        public PostStorage(ILoader loader)
         {
             _loader = loader ?? throw new ArgumentNullException(nameof(loader));
             _db = new SiteContext();

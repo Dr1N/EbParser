@@ -29,13 +29,13 @@ namespace EbParser
 
             var saveFiles = args.Any(a => a == SaveFilesArg);
 
-            using var worker = new Parser(saveFiles);
-            worker.PageChangded += Worker_PageChangded;
-            worker.Error += Worker_Error;
-            worker.Report += Worker_Report;
-            await worker.ParseAsync();
+            using var parser = new Parser(saveFiles);
+            parser.PageChangded += Worker_PageChangded;
+            parser.Error += Worker_Error;
+            parser.Report += Worker_Report;
+            await parser.ParseAsync();
 
-            Console.WriteLine($"Time: {stopWatch.Elapsed.TotalSeconds} sec");
+            Console.WriteLine($"Time: { stopWatch.Elapsed.TotalSeconds } sec");
         }
 
         private static void Worker_Report(object sender, string e)
@@ -47,12 +47,12 @@ namespace EbParser
 
         private static void Worker_Error(object sender, string e)
         {
-            Print($"Error: {e}", ConsoleColor.Red);
+            Print($"Error: { e }", ConsoleColor.Red);
         }
 
         private static void Worker_PageChangded(object sender, Uri e)
         {
-            Print($"Page: {e.AbsoluteUri}");
+            Print($"Page: { e.AbsoluteUri }");
         }
 
         #endregion

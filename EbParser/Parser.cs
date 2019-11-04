@@ -19,7 +19,7 @@ namespace EbParser
 
         #region Fields
 
-        private readonly IPageLoader _loader;
+        private readonly ILoader _loader;
         private readonly IHtmlParser _parser;
         private readonly IPostStorage _storage;
         private readonly bool _saveFiles;
