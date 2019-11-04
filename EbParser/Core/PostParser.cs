@@ -104,8 +104,11 @@ namespace EbParser.Core
         {
             var result = new List<string>();
             var document = await GetDocumentAsync();
+            var poster = document.QuerySelector(EbSelectors.PostPosterSelector).GetAttribute("src");
+            result.Add(poster);
             var content = document.QuerySelectorAll(EbSelectors.PostContentSelector).FirstOrDefault();
             var images = content.QuerySelectorAll("img");
+            images.ToList().ForEach(i => result.Add(i.GetAttribute("src")));
             foreach (var image in images)
             {
                 result.Add(image.GetAttribute("src"));

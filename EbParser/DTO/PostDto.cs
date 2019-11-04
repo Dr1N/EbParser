@@ -5,8 +5,6 @@ namespace EbParser.DTO
 {
     class PostDto
     {
-        public string Url { get; set; }
-
         public string Title { get; set; }
 
         public string Category { get; set; }

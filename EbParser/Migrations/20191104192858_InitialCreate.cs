@@ -64,15 +64,14 @@ namespace EbParser.Migrations
                     PostId = table.Column<int>(nullable: false),
                     Content = table.Column<string>(nullable: false),
                     ParentId = table.Column<int>(nullable: true),
-                    ParentCommentId = table.Column<int>(nullable: true),
                     Updated = table.Column<DateTime>(nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Comments", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Comments_Comments_ParentCommentId",
-                        column: x => x.ParentCommentId,
+                        name: "FK_Comments_Comments_ParentId",
+                        column: x => x.ParentId,
                         principalTable: "Comments",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
@@ -109,9 +108,9 @@ namespace EbParser.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Comments_ParentCommentId",
+                name: "IX_Comments_ParentId",
                 table: "Comments",
-                column: "ParentCommentId");
+                column: "ParentId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Comments_PostId",

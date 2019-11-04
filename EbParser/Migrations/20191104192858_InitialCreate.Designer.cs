@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EbParser.Migrations
 {
     [DbContext(typeof(SiteContext))]
-    [Migration("20191103222738_InitialCreate")]
+    [Migration("20191104192858_InitialCreate")]
     partial class InitialCreate
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -33,9 +33,6 @@ namespace EbParser.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("ParentCommentId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int?>("ParentId")
                         .HasColumnType("INTEGER");
 
@@ -50,7 +47,7 @@ namespace EbParser.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ParentCommentId");
+                    b.HasIndex("ParentId");
 
                     b.HasIndex("PostId");
 
@@ -151,9 +148,9 @@ namespace EbParser.Migrations
 
             modelBuilder.Entity("EbParser.Context.Comment", b =>
                 {
-                    b.HasOne("EbParser.Context.Comment", "ParentComment")
+                    b.HasOne("EbParser.Context.Comment", "Parent")
                         .WithMany()
-                        .HasForeignKey("ParentCommentId");
+                        .HasForeignKey("ParentId");
 
                     b.HasOne("EbParser.Context.Post", "Post")
                         .WithMany("Comments")

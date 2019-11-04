@@ -67,26 +67,15 @@ namespace EbParser.Core
             }
 
             string result = null;
-            try
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var response = await _httpClient.SendAsync(request, CancellationToken.None);
+            if (response.IsSuccessStatusCode)
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                using var response = await _httpClient.SendAsync(request, CancellationToken.None);
-                if (response.IsSuccessStatusCode)
-                {
-                    result = await response.Content.ReadAsStringAsync();
-                }
-                else
-                {
-                    HandleException(new Exception($"Status Code: [{response.StatusCode}]"));
-                }
+                result = await response.Content.ReadAsStringAsync();
             }
-            catch (HttpRequestException httpex)
+            else
             {
-                HandleException(httpex);
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                throw new HttpRequestException($"Status Code: { response.StatusCode }");
             }
 
             return result;
@@ -104,34 +93,21 @@ namespace EbParser.Core
             }
 
             var result = false;
-            try
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var response = await _httpClient.SendAsync(request, CancellationToken.None);
+            if (response.IsSuccessStatusCode)
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                using var response = await _httpClient.SendAsync(request, CancellationToken.None);
-                if (response.IsSuccessStatusCode)
-                {
-                    using var contentStream = await response.Content.ReadAsStreamAsync();
-                    using var fsStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-                    await contentStream.CopyToAsync(fsStream);
-                    result = true;
-                }
+                using var contentStream = await response.Content.ReadAsStreamAsync();
+                using var fsStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+                await contentStream.CopyToAsync(fsStream);
+                result = true;
             }
-            catch (Exception ex)
+            else
             {
-                HandleException(ex);
+                throw new HttpRequestException($"Status Code: { response.IsSuccessStatusCode }");
             }
 
             return result;
-        }
-
-        #endregion
-
-        #region Private
-
-        private void HandleException(Exception ex, [CallerMemberName]string src = "N/A")
-        {
-            Debug.WriteLine($"[{src}]: {ex.Message}");
-            throw ex;
         }
 
         #endregion

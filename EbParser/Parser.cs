@@ -3,10 +3,12 @@ using EbParser.Core;
 using EbParser.DTO;
 using EbParser.Interfaces;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace EbParser
@@ -94,7 +96,7 @@ namespace EbParser
             try
             {
                 RaiseReport("START");
-                var pages = await ParsePagesCount();
+                var pages = await ParsePagesCountAsync();
                 RaiseReport($"Pages: { pages }");
                 var lastUrl = GetLastPostUrl();
                 RaiseReport($"Last: { lastUrl }");
@@ -110,19 +112,35 @@ namespace EbParser
                         RaiseReport(new string('-', 40));
                         var linkTags = await GetPostLinksFromPageAsync(pageUrl);
                         RaiseReport($"Find: { linkTags.Count } posts");
+                        var stopWatch = Stopwatch.StartNew();
                         foreach (var linkTag in linkTags)
                         {
                             try
                             {
                                 var postUrl = await _parser.ParseAttributeAsync(linkTag, "a", "href");
+                                RaiseReport(new string('-', 40));
                                 RaisePage(new Uri(postUrl));
+                                RaiseReport(new string('-', 40));
                                 if (postUrl == lastUrl)
                                 {
                                     isEnd = true;
                                     break;
                                 }
-                                await ParsePostAsync(postUrl);
-                                RaiseReport(new string('-', 40));
+                                var html = await LoadPageAsync(postUrl);
+                                stopWatch.Restart();
+                                using var postParser = new PostParser(html);
+                                var postDto = await postParser.GetPostDtoAsync();
+                                await SaveTagsAsync(postDto.Tags);
+                                var postModel = await SavePostAsync(postDto, postUrl);
+                                RaiseReport($"Page saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
+                                stopWatch.Restart();
+                                var commentDto = await postParser.GetPostCommentsAsync();
+                                await SaveCommentsAsync(commentDto, postModel);
+                                RaiseReport($"Comments saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
+                                var files = await postParser.GetPostFilesAsync();
+                                stopWatch.Restart();
+                                await SavePostFilesAsync(files);
+                                RaiseReport($"Fies saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
                             }
                             catch (Exception ex)
                             {
@@ -148,53 +166,63 @@ namespace EbParser
             }
         }
 
-        private async Task<int> ParsePagesCount()
+        private async Task<int> ParsePagesCountAsync()
         {
-            var site = await _loader.LoadPageAsync(string.Format(Pattern, 0));
-            var pages = await _parser.ParseHtmlAsync(site, EbSelectors.PagesSelector);
-            var last = pages.Last();
-            var result = await _parser.ParseTextAsync(last, "a");
+            var mainPageHtml = await LoadPageAsync(string.Format(Pattern, 0));
+            var pageLinks = await _parser.ParseHtmlAsync(mainPageHtml, EbSelectors.PagesSelector);
+            var lastPage = pageLinks.Last();
+            var result = await _parser.ParseTextAsync(lastPage, "a");
 
             return int.Parse(result);
         }
-
-        private async Task ParsePostAsync(string postUrl)
+       
+        private async Task<string> LoadPageAsync(string url)
         {
             var stopWatch = Stopwatch.StartNew();
-
-            // Load page
-
-            var pageHtml = await _loader.LoadPageAsync(postUrl);
-            RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");
-            stopWatch.Restart();
-
-            // Parse page
-
-            using var pageParser = new PostParser(pageHtml);
-            var post = await pageParser.GetPostDtoAsync();
-            post.Url = postUrl;
-            var comments = await pageParser.GetPostCommentsAsync();
-            RaiseReport($"Page parsed: [{ stopWatch.Elapsed.TotalMilliseconds }]");
-            stopWatch.Restart();
-            
-            // Save page
-
-            await AddToBaseAsync(post, comments);
-            RaiseReport($"Page saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
-            stopWatch.Restart();
-            if (_saveFiles == true)
+            var result = string.Empty;
+            for (int i = 0; i < 3; i++)
             {
-                var files = new List<string>() { post.Poster };
-                files.AddRange(await pageParser.GetPostFilesAsync());
-                await SavePostFiles(files);
-                RaiseReport($"Files saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
+                try
+                {
+                    result = await _loader.LoadPageAsync(url);
+                }
+                catch (HttpRequestException)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5 + i));
+                }
             }
+            RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");
             stopWatch.Stop();
+
+            return result;
+        }
+
+        private async Task<bool> LoadFileAsync(string url, string newName)
+        {
+            var result = false;
+            for (int i = 0; i < 3; i++)
+            {
+                try
+                {
+                    result = await _loader.LoadFileAsync(url, newName);
+                }
+                catch (HttpRequestException ex)
+                {
+                    RaiseError(ex.Message);
+                    await Task.Delay(TimeSpan.FromSeconds(5 + i));
+                }
+                catch (Exception ex)
+                {
+                    RaiseError(ex.Message);
+                }
+            }
+
+            return result;
         }
 
         private async Task<IList<string>> GetPostLinksFromPageAsync(string pageUrl)
         {
-            var content = await _loader.LoadPageAsync(pageUrl);
+            var content = await LoadPageAsync(pageUrl);
             var postTitles = await _parser.ParseHtmlAsync(content, EbSelectors.PostLinkSelector);
 
             return postTitles;
@@ -204,42 +232,26 @@ namespace EbParser
 
         #region Saving
 
-        private async Task AddToBaseAsync(PostDto postDto, IList<CommentDto> commentDTOs)
-        {
-            var stopWatch = Stopwatch.StartNew();
-            var tags = ProcessTags(postDto.Tags);
-            RaiseReport($"Tags saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
-            stopWatch.Restart();
-            var post = await ProcessPost(postDto);
-            RaiseReport($"Post saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
-            stopWatch.Restart();
-            await ProcessComments(commentDTOs, post);
-            RaiseReport($"Comments saved: [{ stopWatch.Elapsed.TotalMilliseconds }]");
-            stopWatch.Stop();
-        }
-
-        private IList<Tag> ProcessTags(IList<string> tags)
+        private async Task<IList<Tag>> SaveTagsAsync(IList<string> tags)
         {
             foreach (var tagName in tags)
             {
                 var dbTag = _db.Tags.FirstOrDefault(t => t.Name == tagName);
                 if (dbTag == null)
                 {
-                    var tagModel = new Tag() { Name = tagName };
-                    _db.Tags.Add(tagModel);
+                    _db.Tags.Add(new Tag() { Name = tagName });
                 }
             }
-
-            _db.SaveChangesAsync();
+            await _db.SaveChangesAsync();
 
             return _db.Tags.ToList();
         }
 
-        private async Task<Post> ProcessPost(PostDto postDto)
+        private async Task<Post> SavePostAsync(PostDto postDto, string url)
         {
             var post = new Post()
             {
-                Url = postDto.Url,
+                Url = url,
                 Title = postDto.Title,
                 Publish = postDto.Publish,
                 Poster = postDto.Poster,
@@ -253,14 +265,13 @@ namespace EbParser
                 var postTag = new PostTag() { Post = post, Tag = dbTag };
                 _db.PostTags.Add(postTag);
             }
-            //await _db.SaveChangesAsync();
             _db.Posts.Add(post);
             await _db.SaveChangesAsync();
 
             return post;
         }
 
-        private async Task<IList<Comment>> ProcessComments(IList<CommentDto> comments, Post post)
+        private async Task<IList<Comment>> SaveCommentsAsync(IList<CommentDto> comments, Post post)
         {
             var firstLevelComments = comments
                 .Where(c => c.ParrentId == 0)
@@ -273,18 +284,18 @@ namespace EbParser
                     Publish = comment.Publish,
                     Post = post,
                     Content = comment.Content,
-                    ParentId = null,
+                    Parent = null,
                     Updated = DateTime.Now,
                 };
                 _db.Comments.Add(dbComment);
-
-                await ProcessChildComments(comments, comment, dbComment.Id, post);
+                await SaveChildCommentsAsync(comments, comment, dbComment, post);
             }
+            await _db.SaveChangesAsync();
 
             return _db.Comments.ToList();
         }
 
-        private async Task ProcessChildComments(IList<CommentDto> allComments, CommentDto parent, int parentId, Post post)
+        private async Task SaveChildCommentsAsync(IList<CommentDto> allComments, CommentDto parent, Comment parentModel, Post post)
         {
             var children = allComments
                 .Where(c => c.ParrentId == parent.Id)
@@ -293,6 +304,7 @@ namespace EbParser
             {
                 return;
             }
+
             foreach (var child in children)
             {
                 var dbComment = new Comment()
@@ -301,34 +313,46 @@ namespace EbParser
                     Publish = child.Publish,
                     Post = post,
                     Content = child.Content,
-                    ParentId = parentId,
+                    Parent = parentModel,
                     Updated = DateTime.Now,
                 };
                 _db.Comments.Add(dbComment);
-
-                await ProcessChildComments(allComments, child, dbComment.Id, post);
+                await SaveChildCommentsAsync(allComments, child, dbComment, post);
             }
         }
 
-        private async Task SavePostFiles(IList<string> files)
+        private async Task<IList<Context.File>> SavePostFilesAsync(IList<string> files)
         {
-            foreach (var fileSrc in files)
+            if (_saveFiles)
             {
-                var name = await SaveSiteFile(fileSrc);
-                if (!string.IsNullOrEmpty(name))
+                var tasks = new List<Task>();
+                var bag = new ConcurrentBag<Context.File>();
+                foreach (var fileSrc in files)
                 {
-                    var file = new Context.File()
+                    var task = Task.Run(async () => 
                     {
-                        Url = fileSrc,
-                        FileName = name,
-                    };
-                    _db.Files.Add(file);
+                        var name = await SaveSiteFileAsync(fileSrc);
+                        if (!string.IsNullOrEmpty(name))
+                        {
+                            var file = new Context.File()
+                            {
+                                Url = fileSrc,
+                                FileName = name,
+                            };
+                            bag.Add(file);
+                        }
+                    });
+                    tasks.Add(task);
                 }
+                Task.WaitAll(tasks.ToArray());
+                _db.Files.AddRange(bag);
+                await _db.SaveChangesAsync();
             }
-            await _db.SaveChangesAsync();
+
+            return _db.Files.ToList();
         }
 
-        private async Task<string> SaveSiteFile(string url)
+        private async Task<string> SaveSiteFileAsync(string url)
         {
             string result = null;
 
@@ -342,15 +366,10 @@ namespace EbParser
                 return result;
             }
 
-            if (FileExists(url))
-            {
-                return result;
-            }
-
             var directory = CreateFilesDirecory();
             var ext = Path.GetExtension(fileName);
             var newName = Path.Combine(directory, Guid.NewGuid().ToString() + ext);
-            await _loader.LoadFileAsync(url, newName);
+            await LoadFileAsync(url, newName);
             result = newName;
 
             return result;
@@ -377,22 +396,6 @@ namespace EbParser
             catch (Exception ex)
             {
                 Debug.WriteLine($"{ex.Message}");
-            }
-
-            return result;
-        }
-
-        private bool FileExists(string url)
-        {
-            var result = false;
-
-            var inDb = _db.Files.FirstOrDefault(f => f.Url == url);
-            if (inDb != null)
-            {
-                var path = Path.Combine(FileDirectory, inDb.FileName);
-                var inDirectory = System.IO.File.Exists(path);
-
-                result = inDirectory;
             }
 
             return result;
