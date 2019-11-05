@@ -14,6 +14,7 @@ namespace EbParser
         #region Constants
 
         private const string Pattern = "https://ebanoe.it/page/{0}/";
+        private const int Attmps = 3;
 
         #endregion
 
@@ -92,19 +93,19 @@ namespace EbParser
                 RaiseReport("START");
                 var pages = await ParsePagesCountAsync();
                 RaiseReport($"Pages: { pages }");
-                var lastUrl = _storage.GetLastPostUrl();
+                var lastUrl = _storage.GetLastPostUrl();    // Load last parsed post
                 RaiseReport($"Last: { lastUrl }");
                 var isEnd = false;
                 for (int i = 0; i <= pages; i++)
                 {
                     try
                     {
-                        if (i == 1) continue; // Skip first page
+                        if (i == 1) continue;   // Skip first page
                         var pageUrl = string.Format(Pattern, i);
                         RaiseReport(new string('-', 40));
                         RaisePage(new Uri(pageUrl));
                         RaiseReport(new string('-', 40));
-                        var linkTags = await GetPostLinksFromPageAsync(pageUrl);
+                        var linkTags = await GetPostLinksFromPageAsync(pageUrl);    // Parse post url's from page
                         RaiseReport($"Find: { linkTags.Count } posts");
                         var stopWatch = Stopwatch.StartNew();
                         foreach (var linkTag in linkTags)
@@ -120,8 +121,11 @@ namespace EbParser
                                     isEnd = true;
                                     break;
                                 }
-                                var html = await LoadPageAsync(postUrl);
+                                var html = await LoadPageAsync(postUrl);    // Load post html
                                 stopWatch.Restart();
+
+                                // Parse elements and save to storage
+
                                 using var postParser = new PostParser(html);
                                 var postDto = await postParser.GetPostDtoAsync();
                                 await _storage.SaveTagsAsync(postDto.Tags);
@@ -131,10 +135,13 @@ namespace EbParser
                                 var commentDto = await postParser.GetPostCommentsAsync();
                                 await _storage.SaveCommentsAsync(commentDto, postModel);
                                 RaiseReport($"Comments saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
-                                var files = await postParser.GetPostFilesAsync();
                                 stopWatch.Restart();
+
+                                // Save post files if needed
+
                                 if (_saveFiles)
                                 {
+                                    var files = await postParser.GetPostFilesAsync();
                                     await _storage.SavePostFilesAsync(files);
                                     RaiseReport($"Fies saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
                                 }
@@ -144,7 +151,6 @@ namespace EbParser
                                 RaiseError(ex.Message);
                             }
                         }
-                        //break; // TODO: debug
                     }
                     catch (Exception ex)
                     {
@@ -165,7 +171,7 @@ namespace EbParser
 
         private async Task<int> ParsePagesCountAsync()
         {
-            var mainPageHtml = await LoadPageAsync(string.Format(Pattern, 0));
+            var mainPageHtml = await LoadPageAsync(string.Format(Pattern, 0));  // Main page
             var pageLinks = await _parser.ParseHtmlAsync(mainPageHtml, EbSelectors.PagesSelector);
             var lastPage = pageLinks.Last();
             var result = await _parser.ParseTextAsync(lastPage, "a");
@@ -177,7 +183,7 @@ namespace EbParser
         {
             var stopWatch = Stopwatch.StartNew();
             var result = string.Empty;
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < Attmps; i++)
             {
                 try
                 {
@@ -185,7 +191,7 @@ namespace EbParser
                 }
                 catch (HttpRequestException)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(5 + i));
+                    await Task.Delay(TimeSpan.FromSeconds(5 + i)); // Wait and continue
                 }
             }
             RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");

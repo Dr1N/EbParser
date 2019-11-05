@@ -3,14 +3,12 @@ using AngleSharp.Dom;
 using EbParser.Interfaces;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace EbParser.Core
 {
-    class AngelParser : IHtmlParser, IDisposable
+    class AngelParser : IHtmlParser
     {
         #region Fields
 
@@ -20,47 +18,15 @@ namespace EbParser.Core
 
         #region Life
 
-        #region IDisposable Support
-
-        private bool disposedValue = false;
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    (_browsingContext as IDisposable)?.Dispose();
-                }
-
-                disposedValue = true;
-            }
-        }
-        
-        public void Dispose()
-        {
-            Dispose(true);
-        }
-
-        #endregion
-
-        #endregion
-
         public AngelParser()
         {
-            var configuration = Configuration.Default;
-            _browsingContext = BrowsingContext.New(configuration);
+            _browsingContext = BrowsingContext.New(Configuration.Default);
         }
+
+        #endregion
 
         #region IHtmlParser Implementation
 
-        /// <summary>
-        /// Parse html element
-        /// </summary>
-        /// <param name="html">Html source</param>
-        /// <param name="selector">Element selector</param>
-        /// <returns>Colletion of elements content. Emtpy collection if error</returns>
-        /// <exception cref="ArgumentNullException"/>
         public async Task<IList<string>> ParseHtmlAsync(string html, string selector)
         {
             if (string.IsNullOrEmpty(html))
@@ -71,31 +37,17 @@ namespace EbParser.Core
             {
                 throw new ArgumentNullException(nameof(selector));
             }
+
             var result = new List<string>();
-            try
+            var elements = await GetElementsAsync(html, selector);
+            foreach (var element in elements)
             {
-                var elements = await GetElements(html, selector);
-                foreach (var element in elements)
-                {
-                    result.Add(element.OuterHtml);
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                result.Add(element.OuterHtml);
             }
 
             return result;
         }
 
-        /// <summary>
-        /// Parse element attribute value
-        /// </summary>
-        /// <param name="html">Html source</param>
-        /// <param name="selector">Element selector</param>
-        /// <param name="attribute">Attribute name</param>
-        /// <returns>Attribute value, if error null</returns>
-        /// <exception cref="ArgumentNullException"/>
         public async Task<string> ParseAttributeAsync(string html, string selector, string attribute)
         {
             if (string.IsNullOrEmpty(html))
@@ -110,30 +62,17 @@ namespace EbParser.Core
             {
                 throw new ArgumentNullException(nameof(attribute));
             }
+
             string result = null;
-            try
+            var elements = await GetElementsAsync(html, selector);
+            if (elements.Any())
             {
-                var elements = await GetElements(html, selector);
-                if (elements.Any())
-                {
-                    result = elements.First().GetAttribute(attribute);
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                result = elements.First().GetAttribute(attribute);
             }
 
             return result;
         }
 
-        /// <summary>
-        /// Parse text from element
-        /// </summary>
-        /// <param name="html">Html source</param>
-        /// <param name="selector">Element selector</param>
-        /// <returns>Text of element or null if error</returns>
-        /// <exception cref="ArgumentNullException"/>
         public async Task<string> ParseTextAsync(string html, string selector)
         {
             if (string.IsNullOrEmpty(html))
@@ -146,17 +85,10 @@ namespace EbParser.Core
             }
 
             string result = null;
-            try
+            var elements = await GetElementsAsync(html, selector);
+            if (elements.Any())
             {
-                var elements = await GetElements(html, selector);
-                if (elements.Any())
-                {
-                    result = elements.First().TextContent;
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                result = elements.First().TextContent;
             }
 
             return result;
@@ -166,7 +98,7 @@ namespace EbParser.Core
 
         #region Private
 
-        private async Task<IList<IElement>> GetElements(string html, string selector)
+        private async Task<IList<IElement>> GetElementsAsync(string html, string selector)
         {
             var result = new List<IElement>();
             var document = await _browsingContext.OpenAsync(req => req.Content(html));
@@ -183,12 +115,6 @@ namespace EbParser.Core
             }
 
             return result;
-        }
-
-        private void HandleException(Exception ex, [CallerMemberName]string src = "N/A")
-        {
-            Debug.WriteLine($"{src}: {ex.Message}");
-            throw ex;
         }
 
         #endregion
