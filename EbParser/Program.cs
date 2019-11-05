@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace EbParser
@@ -8,6 +10,8 @@ namespace EbParser
     class Program
     {
         private const string SaveFilesArg = "-f";
+        private const string StartPageArg = "-p=";
+        private static StringBuilder _sb;
 
         static void Main(string[] args)
         {
@@ -25,15 +29,18 @@ namespace EbParser
 
         static async Task MainAsync(string[] args)
         {
+            _sb = new StringBuilder();
             var stopWatch = Stopwatch.StartNew();
 
             var saveFiles = args.Any(a => a == SaveFilesArg);
-
-            using var parser = new Parser(saveFiles);
+            var startPage = args.FirstOrDefault(a => a.Contains(StartPageArg))?.Split("=").Last();
+            int.TryParse(startPage, out int page);
+            using var parser = new Parser(saveFiles, page);
             parser.PageChangded += Worker_PageChangded;
             parser.Error += Worker_Error;
             parser.Report += Worker_Report;
             await parser.ParseAsync();
+            File.WriteAllText("parse.log", _sb.ToString());
 
             Console.WriteLine($"Time: { stopWatch.Elapsed.TotalSeconds } sec");
         }
@@ -67,7 +74,9 @@ namespace EbParser
                 Console.ForegroundColor = color;
                 try
                 {
-                    Console.WriteLine("{0, -10}{1}", dt.ToLongTimeString(), message);
+                    var msg = string.Format("{0, -10}{1}", dt.ToLongTimeString(), message);
+                    _sb.AppendLine(msg);
+                    Console.WriteLine(msg);
                 }
                 finally
                 {

@@ -24,6 +24,7 @@ namespace EbParser
         private readonly IHtmlParser _parser;
         private readonly IPostStorage _storage;
         private readonly bool _saveFiles;
+        private int _start;
 
         #endregion
 
@@ -37,12 +38,13 @@ namespace EbParser
 
         #region Life
 
-        public Parser(bool saveFiles)
+        public Parser(bool saveFiles, int? startPage = null)
         {
             _loader = new PageLoader();
             _parser = new AngelParser();
             _storage = new PostStorage(_loader);
             _saveFiles = saveFiles;
+            _start = startPage ?? 0;
         }
 
         #region IDisposable Support
@@ -96,7 +98,7 @@ namespace EbParser
                 var lastUrl = _storage.GetLastPostUrl();    // Load last parsed post
                 RaiseReport($"Last: { lastUrl }");
                 var isEnd = false;
-                for (int i = 0; i <= pages; i++)
+                for (int i = _start; i <= pages; i++)
                 {
                     try
                     {
@@ -116,10 +118,14 @@ namespace EbParser
                                 RaiseReport(new string('-', 40));
                                 RaisePage(new Uri(postUrl));
                                 RaiseReport(new string('-', 40));
-                                if (postUrl == lastUrl)
+                                if (postUrl == lastUrl)     // Save only new posts
                                 {
                                     isEnd = true;
                                     break;
+                                }
+                                else if (_start != 0 && _storage.IsExists(postUrl))     // Continue loading from page
+                                {
+                                    continue;
                                 }
                                 var html = await LoadPageAsync(postUrl);    // Load post html
                                 stopWatch.Restart();
@@ -188,6 +194,7 @@ namespace EbParser
                 try
                 {
                     result = await _loader.LoadPageAsync(url);
+                    break;
                 }
                 catch (HttpRequestException)
                 {

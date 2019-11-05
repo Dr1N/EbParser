@@ -16,5 +16,7 @@ namespace EbParser.Interfaces
         Task<IList<File>> SavePostFilesAsync(IList<string> files);
 
         string GetLastPostUrl();
+
+        bool IsExists(string url);
     }
 }

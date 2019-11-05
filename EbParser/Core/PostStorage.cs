@@ -165,6 +165,11 @@ namespace EbParser.Core
             return lastPost?.Url;
         }
 
+        public bool IsExists(string url)
+        {
+            return _db.Posts.Any(p => p.Url == url);
+        }
+
         #endregion
 
         #region Private
