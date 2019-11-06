@@ -1,8 +1,7 @@
 {
   "profiles": {
     "EbParser": {
-      "commandName": "Project",
-      "commandLineArgs": "-p=53"
+      "commandName": "Project"
     }
   }
 }
