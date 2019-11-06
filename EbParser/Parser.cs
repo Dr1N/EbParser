@@ -22,10 +22,10 @@ namespace EbParser
 
         #region Fields
 
-        private ILoader _loader;
         private readonly IHtmlParser _parser;
         private readonly IPostStorage _storage;
         private readonly bool _saveFiles;
+        private ILoader _loader;
         private int _start;
 
         #endregion
@@ -206,7 +206,8 @@ namespace EbParser
                     {
                         await Task.Delay(TimeSpan.FromSeconds(5 + i));      // Wait and continue
                     }
-                    else if (ex.Message.Contains(HttpStatusCode.BadRequest.ToString()))     // Create new loader
+                    else if (ex.Message.Contains(HttpStatusCode.BadRequest.ToString())
+                            || ex.Message.Contains(HttpStatusCode.InternalServerError.ToString()))     // Create new loader
                     {
                         (_loader as IDisposable)?.Dispose();
                         _loader = new PageLoader();

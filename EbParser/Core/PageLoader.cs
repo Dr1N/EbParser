@@ -73,7 +73,7 @@ namespace EbParser.Core
             }
             else
             {
-                throw new HttpRequestException($"Status Code: { response.StatusCode }");
+                 throw new HttpRequestException($"Status Code: { response.StatusCode }");
             }
 
             return result;
