@@ -46,12 +46,12 @@ namespace EbParser
             Console.WriteLine($"Time: { stopWatch.Elapsed.TotalSeconds } sec");
         }
 
+        #region Callbacks
+
         private static void Worker_Report(object sender, string e)
         {
-            Print($"Info: {e}");
+            Print($"Info: { e }");
         }
-
-        #region Callbacks
 
         private static void Worker_Error(object sender, string e)
         {

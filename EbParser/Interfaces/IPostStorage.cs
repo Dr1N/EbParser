@@ -7,13 +7,13 @@ namespace EbParser.Interfaces
 {
     interface IPostStorage
     {
-        Task<IList<Tag>> SaveTagsAsync(IList<string> tags);
+        Task SaveTagsAsync(IList<string> tags);
 
         Task<Post> SavePostAsync(PostDto postDto, string url);
 
-        Task<IList<Comment>> SaveCommentsAsync(IList<CommentDto> comments, Post post);
+        Task SaveCommentsAsync(IList<CommentDto> comments, Post post);
 
-        Task<IList<File>> SavePostFilesAsync(IList<string> files);
+        Task SavePostFilesAsync(IList<string> files);
 
         string GetLastPostUrl();
 

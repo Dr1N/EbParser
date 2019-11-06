@@ -1,6 +1,7 @@
 ﻿using EbParser.Context;
 using EbParser.DTO;
 using EbParser.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -63,7 +64,7 @@ namespace EbParser.Core
 
         #region IPostStorage Implementation
 
-        public async Task<IList<Tag>> SaveTagsAsync(IList<string> tags)
+        public async Task SaveTagsAsync(IList<string> tags)
         {
             foreach (var tagName in tags)
             {
@@ -74,8 +75,6 @@ namespace EbParser.Core
                 }
             }
             await _db.SaveChangesAsync();
-
-            return _db.Tags.ToList();
         }
 
         public async Task<Post> SavePostAsync(PostDto postDto, string url)
@@ -102,7 +101,7 @@ namespace EbParser.Core
             return post;
         }
 
-        public async Task<IList<Comment>> SaveCommentsAsync(IList<CommentDto> comments, Post post)
+        public async Task SaveCommentsAsync(IList<CommentDto> comments, Post post)
         {
             var firstLevelComments = comments
                 .Where(c => c.ParrentId == 0)
@@ -122,11 +121,9 @@ namespace EbParser.Core
                 await SaveChildCommentsAsync(comments, comment, dbComment, post);
             }
             await _db.SaveChangesAsync();
-
-            return _db.Comments.ToList();
         }
 
-        public async Task<IList<Context.File>> SavePostFilesAsync(IList<string> files)
+        public async Task SavePostFilesAsync(IList<string> files)
         {
             var tasks = new List<Task>();
             var bag = new ConcurrentBag<Context.File>();
@@ -150,14 +147,14 @@ namespace EbParser.Core
             Task.WaitAll(tasks.ToArray());
             _db.Files.AddRange(bag);
             await _db.SaveChangesAsync();
-
-            return _db.Files.ToList();
         }
 
         public string GetLastPostUrl()
         {
             var result = string.Empty;
+            var c = _db.Posts.Count();
             var lastPost = _db.Posts
+                .AsNoTracking()
                 .ToList()
                 .OrderBy(p => p.Publish.ToUnixTimeSeconds())
                 .LastOrDefault();
