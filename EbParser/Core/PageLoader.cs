@@ -64,7 +64,7 @@ namespace EbParser.Core
                 throw new ArgumentException(nameof(url));
             }
 
-            string result = null;
+            string result = string.Empty;
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             using var response = await _httpClient.SendAsync(request, CancellationToken.None);
             if (response.IsSuccessStatusCode)
@@ -102,7 +102,7 @@ namespace EbParser.Core
             }
             else
             {
-                throw new HttpRequestException($"Status Code: { response.IsSuccessStatusCode }");
+                throw new HttpRequestException(response.StatusCode.ToString());
             }
 
             return result;

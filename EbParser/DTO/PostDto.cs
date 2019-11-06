@@ -18,5 +18,9 @@ namespace EbParser.DTO
         public string Author { get; set; }
 
         public IList<string> Tags { get; set; } = new List<string>();
+
+        public IList<CommentDto> Comments { get; set; } = new List<CommentDto>();
+
+        public IList<string> Files { get; set; } = new List<string>();
     }
 }

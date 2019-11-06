@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -23,17 +24,16 @@ namespace EbParser.Core
 
         #region Fields
 
-        private readonly ILoader _loader;
-        private readonly SiteContext _db;
+        private SiteContext _db;
+        private ILoader _loader;
 
         #endregion
 
         #region Life
 
-        public PostStorage(ILoader loader)
+        public PostStorage()
         {
-            _loader = loader ?? throw new ArgumentNullException(nameof(loader));
-            _db = new SiteContext();
+            _loader = new PageLoader();
         }
 
         #region IDisposable Support
@@ -46,7 +46,7 @@ namespace EbParser.Core
             {
                 if (disposing)
                 {
-                    _db.Dispose();
+                    _db?.Dispose();
                 }
 
                 disposedValue = true;
@@ -64,7 +64,65 @@ namespace EbParser.Core
 
         #region IPostStorage Implementation
 
-        public async Task SaveTagsAsync(IList<string> tags)
+        public async Task SavePostAsync(string url, PostDto postDto)
+        {
+            using (_db = new SiteContext())
+            {
+                await SaveTagsAsync(postDto.Tags);
+                var post = new Post()
+                {
+                    Url = url,
+                    Title = postDto.Title,
+                    Publish = postDto.Publish,
+                    Poster = postDto.Poster,
+                    Content = postDto.Content,
+                    Category = postDto.Category,
+                    Updated = DateTime.Now,
+                };
+                SavePostTags(postDto, post);
+                _db.Posts.Add(post);
+                await _db.SaveChangesAsync();
+                if (postDto.Comments.Count > 0)
+                {
+                    await SaveCommentsAsync(postDto.Comments, post);
+                    await _db.SaveChangesAsync();
+                }
+                if (postDto.Files.Count > 0)
+                {
+                    await SavePostFilesAsync(postDto.Files);
+                    await _db.SaveChangesAsync();
+                }
+            }
+            _db = null;
+        }
+
+        public string GetLastPostUrl()
+        {
+            using (_db = new SiteContext())
+            {
+                var lastPost = _db.Posts
+               .AsNoTracking()
+               .ToList()
+               .OrderBy(p => p.Publish.ToUnixTimeSeconds())
+               .LastOrDefault();
+
+                return lastPost?.Url;
+            }
+        }
+
+        public bool IsExists(string url)
+        {
+            using (_db = new SiteContext())
+            {
+                return _db.Posts.Any(p => p.Url == url);
+            }
+        }
+
+        #endregion
+
+        #region Private
+
+        private async Task SaveTagsAsync(IList<string> tags)
         {
             foreach (var tagName in tags)
             {
@@ -77,31 +135,17 @@ namespace EbParser.Core
             await _db.SaveChangesAsync();
         }
 
-        public async Task<Post> SavePostAsync(PostDto postDto, string url)
+        private void SavePostTags(PostDto postDto, Post post)
         {
-            var post = new Post()
-            {
-                Url = url,
-                Title = postDto.Title,
-                Publish = postDto.Publish,
-                Poster = postDto.Poster,
-                Content = postDto.Content,
-                Category = postDto.Category,
-                Updated = DateTime.Now,
-            };
             foreach (var tag in postDto.Tags)
             {
                 var dbTag = _db.Tags.FirstOrDefault(t => t.Name == tag);
                 var postTag = new PostTag() { Post = post, Tag = dbTag };
                 _db.PostTags.Add(postTag);
             }
-            _db.Posts.Add(post);
-            await _db.SaveChangesAsync();
-
-            return post;
         }
 
-        public async Task SaveCommentsAsync(IList<CommentDto> comments, Post post)
+        private async Task SaveCommentsAsync(IList<CommentDto> comments, Post post)
         {
             var firstLevelComments = comments
                 .Where(c => c.ParrentId == 0)
@@ -122,54 +166,6 @@ namespace EbParser.Core
             }
             await _db.SaveChangesAsync();
         }
-
-        public async Task SavePostFilesAsync(IList<string> files)
-        {
-            var tasks = new List<Task>();
-            var bag = new ConcurrentBag<Context.File>();
-            foreach (var fileSrc in files)
-            {
-                var task = Task.Run(async () =>
-                {
-                    var name = await SaveSiteFileAsync(fileSrc);
-                    if (!string.IsNullOrEmpty(name))
-                    {
-                        var file = new Context.File()
-                        {
-                            Url = fileSrc,
-                            FileName = name,
-                        };
-                        bag.Add(file);
-                    }
-                });
-                tasks.Add(task);
-            }
-            Task.WaitAll(tasks.ToArray());
-            _db.Files.AddRange(bag);
-            await _db.SaveChangesAsync();
-        }
-
-        public string GetLastPostUrl()
-        {
-            var result = string.Empty;
-            var c = _db.Posts.Count();
-            var lastPost = _db.Posts
-                .AsNoTracking()
-                .ToList()
-                .OrderBy(p => p.Publish.ToUnixTimeSeconds())
-                .LastOrDefault();
-            
-            return lastPost?.Url;
-        }
-
-        public bool IsExists(string url)
-        {
-            return _db.Posts.Any(p => p.Url == url);
-        }
-
-        #endregion
-
-        #region Private
 
         private async Task SaveChildCommentsAsync(IList<CommentDto> allComments, 
             CommentDto parent, 
@@ -198,6 +194,32 @@ namespace EbParser.Core
                 _db.Comments.Add(dbComment);
                 await SaveChildCommentsAsync(allComments, child, dbComment, post);
             }
+        }
+
+        private async Task SavePostFilesAsync(IList<string> files)
+        {
+            var tasks = new List<Task>();
+            var bag = new ConcurrentBag<Context.File>();
+            foreach (var fileSrc in files)
+            {
+                var task = Task.Run(async () =>
+                {
+                    var name = await SaveSiteFileAsync(fileSrc);
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        var file = new Context.File()
+                        {
+                            Url = fileSrc,
+                            FileName = name,
+                        };
+                        bag.Add(file);
+                    }
+                });
+                tasks.Add(task);
+            }
+            Task.WaitAll(tasks.ToArray());
+            _db.Files.AddRange(bag);
+            await _db.SaveChangesAsync();
         }
 
         private async Task<string> SaveSiteFileAsync(string url)
@@ -232,9 +254,18 @@ namespace EbParser.Core
                 {
                     result = await _loader.LoadFileAsync(url, newName);
                 }
-                catch (HttpRequestException)
+                catch (HttpRequestException ex)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(5 + i));
+                    if (ex.Message.Contains(HttpStatusCode.TooManyRequests.ToString()))
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5 + i));      // Wait and continue
+                    }
+                    else if (ex.Message.Contains(HttpStatusCode.BadRequest.ToString()))     // Create new loader
+                    {
+                        (_loader as IDisposable)?.Dispose();
+                        _loader = new PageLoader();
+                        await Task.Delay(TimeSpan.FromSeconds(5 + i));
+                    }
                 }
             }
 

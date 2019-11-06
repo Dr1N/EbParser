@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -14,13 +15,14 @@ namespace EbParser
         #region Constants
 
         private const string Pattern = "https://ebanoe.it/page/{0}/";
-        private const int Attmps = 3;
+        private const int Attmps = 4;
+        private readonly string Separator = new string('=', 50);
 
         #endregion
 
         #region Fields
 
-        private readonly ILoader _loader;
+        private ILoader _loader;
         private readonly IHtmlParser _parser;
         private readonly IPostStorage _storage;
         private readonly bool _saveFiles;
@@ -42,7 +44,7 @@ namespace EbParser
         {
             _loader = new PageLoader();
             _parser = new AngelParser();
-            _storage = new PostStorage(_loader);
+            _storage = new PostStorage();
             _saveFiles = saveFiles;
             _start = startPage ?? 0;
         }
@@ -93,10 +95,10 @@ namespace EbParser
             try
             {
                 RaiseReport("START");
-                var pages = await ParsePagesCountAsync();
+                var pages = await ParsePagesCountAsync();   // Site peges count
                 RaiseReport($"Pages: { pages }");
                 var lastUrl = _storage.GetLastPostUrl();    // Load last parsed post
-                RaiseReport($"Last: { lastUrl }");
+                RaiseReport($"Last: { lastUrl ?? "New session" }");
                 var isEnd = false;
                 for (int i = _start; i <= pages; i++)
                 {
@@ -104,20 +106,21 @@ namespace EbParser
                     {
                         if (i == 1) continue;   // Skip first page
                         var pageUrl = string.Format(Pattern, i);
-                        RaiseReport(new string('-', 40));
+
+                        RaiseReport(Separator);
                         RaisePage(new Uri(pageUrl));
-                        RaiseReport(new string('-', 40));
-                        var linkTags = await GetPostLinksFromPageAsync(pageUrl);    // Parse post url's from page
-                        RaiseReport($"Find: { linkTags.Count } posts");
+                        RaiseReport(Separator);
+
+                        var postLinkTags = await GetPostUrlsFromPageAsync(pageUrl);    // Parse post url's from page
                         var stopWatch = Stopwatch.StartNew();
-                        foreach (var linkTag in linkTags)
+                        foreach (var postUrl in postLinkTags)
                         {
                             try
                             {
-                                var postUrl = await _parser.ParseAttributeAsync(linkTag, "a", "href");
-                                RaiseReport(new string('-', 40));
+                                RaiseReport(Separator);
                                 RaisePage(new Uri(postUrl));
-                                RaiseReport(new string('-', 40));
+                                RaiseReport(Separator);
+
                                 if (postUrl == lastUrl)     // Save only new posts
                                 {
                                     isEnd = true;
@@ -127,30 +130,29 @@ namespace EbParser
                                 {
                                     continue;
                                 }
+                                stopWatch.Restart();
+
                                 var html = await LoadPageAsync(postUrl);    // Load post html
+                                RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");
+                                if (string.IsNullOrEmpty(html))
+                                {
+                                    RaiseError($"Can't load page: {postUrl}");
+                                    continue;
+                                }
                                 stopWatch.Restart();
 
                                 // Parse elements and save to storage
 
                                 using var postParser = new PostParser(html);
                                 var postDto = await postParser.GetPostDtoAsync();
-                                await _storage.SaveTagsAsync(postDto.Tags);
-                                var postModel = await _storage.SavePostAsync(postDto, postUrl);
-                                RaiseReport($"Page saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
-                                stopWatch.Restart();
-                                var commentDto = await postParser.GetPostCommentsAsync();
-                                await _storage.SaveCommentsAsync(commentDto, postModel);
-                                RaiseReport($"Comments saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
+                                postDto.Comments = await postParser.GetPostCommentsAsync();
+                                postDto.Files = _saveFiles ? await postParser.GetPostFilesAsync() : new List<string>();
+
+                                RaiseReport($"Post parsed: [{ stopWatch.Elapsed.TotalMilliseconds }]");
                                 stopWatch.Restart();
 
-                                // Save post files if needed
-
-                                if (_saveFiles)
-                                {
-                                    var files = await postParser.GetPostFilesAsync();
-                                    await _storage.SavePostFilesAsync(files);
-                                    RaiseReport($"Fies saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
-                                }
+                                await _storage.SavePostAsync(postUrl, postDto);
+                                RaiseReport($"Post saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
                             }
                             catch (Exception ex)
                             {
@@ -187,32 +189,50 @@ namespace EbParser
        
         private async Task<string> LoadPageAsync(string url)
         {
-            var stopWatch = Stopwatch.StartNew();
             var result = string.Empty;
             for (int i = 0; i < Attmps; i++)
             {
                 try
                 {
                     result = await _loader.LoadPageAsync(url);
-                    break;
+                    if (!string.IsNullOrEmpty(result))
+                    {
+                        break;
+                    }
                 }
-                catch (HttpRequestException)
+                catch (HttpRequestException ex)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(5 + i)); // Wait and continue
+                    if (ex.Message.Contains(HttpStatusCode.TooManyRequests.ToString()))
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5 + i));      // Wait and continue
+                    }
+                    else if (ex.Message.Contains(HttpStatusCode.BadRequest.ToString()))     // Create new loader
+                    {
+                        (_loader as IDisposable)?.Dispose();
+                        _loader = new PageLoader();
+                        await Task.Delay(TimeSpan.FromSeconds(5 + i));
+                    }
                 }
             }
-            RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");
-            stopWatch.Stop();
 
             return result;
         }
 
-        private async Task<IList<string>> GetPostLinksFromPageAsync(string pageUrl)
+        private async Task<IList<string>> GetPostUrlsFromPageAsync(string pageUrl)
         {
+            var result = new List<string>();
             var content = await LoadPageAsync(pageUrl);
             var postTitles = await _parser.ParseHtmlAsync(content, EbSelectors.PostLinkSelector);
+            foreach (var postTitle in postTitles)
+            {
+                var url = await _parser.ParseAttributeAsync(postTitle, "a", "href");
+                if (!string.IsNullOrEmpty(url))
+                {
+                    result.Add(url);
+                }
+            }
 
-            return postTitles;
+            return result;
         }
 
         #endregion
