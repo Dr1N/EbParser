@@ -41,6 +41,7 @@ namespace EbParser
             parser.Report += Worker_Report;
             await parser.ParseAsync();
             File.WriteAllText("parse.log", _sb.ToString());
+            _sb.Clear();
 
             Console.WriteLine($"Time: { stopWatch.Elapsed.TotalSeconds } sec");
         }
