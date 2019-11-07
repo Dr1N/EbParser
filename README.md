@@ -16,3 +16,4 @@ Parse site to SQLite db
 Build solution in VS2019 or via dotnet (v3+)
 ## Command line
 * -f - save images from site (to /files folder)
+* -p={int} - start page
