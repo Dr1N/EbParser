@@ -14,9 +14,8 @@ namespace EbParser
     {
         #region Constants
 
-        private const string Pattern = "https://ebanoe.it/page/{0}/";
+        private const string PagePattern = "https://ebanoe.it/page/{0}/";
         private const int Attmps = 4;
-        private readonly string Separator = new string('=', 50);
 
         #endregion
 
@@ -25,8 +24,8 @@ namespace EbParser
         private readonly IHtmlParser _parser;
         private readonly IPostStorage _storage;
         private readonly bool _saveFiles;
+        private readonly int _start;
         private ILoader _loader;
-        private int _start;
 
         #endregion
 
@@ -81,17 +80,6 @@ namespace EbParser
 
         public async Task ParseAsync()
         {
-            await ParseSiteAsync();
-        }
-
-        #endregion
-
-        #region Private
-
-        #region Parsing
-
-        private async Task ParseSiteAsync()
-        {
             try
             {
                 RaiseReport("START");
@@ -105,22 +93,16 @@ namespace EbParser
                     try
                     {
                         if (i == 1) continue;   // Skip first page
-                        var pageUrl = string.Format(Pattern, i);
+                        var pageUrl = string.Format(PagePattern, i);
 
-                        RaiseReport(Separator);
                         RaisePage(new Uri(pageUrl));
-                        RaiseReport(Separator);
-
                         var postLinkTags = await GetPostUrlsFromPageAsync(pageUrl);    // Parse post url's from page
                         var stopWatch = Stopwatch.StartNew();
                         foreach (var postUrl in postLinkTags)
                         {
                             try
                             {
-                                RaiseReport(Separator);
                                 RaisePage(new Uri(postUrl));
-                                RaiseReport(Separator);
-
                                 if (postUrl == lastUrl)     // Save only new posts
                                 {
                                     isEnd = true;
@@ -130,8 +112,8 @@ namespace EbParser
                                 {
                                     continue;
                                 }
-                                stopWatch.Restart();
 
+                                stopWatch.Restart();
                                 var html = await LoadPageAsync(postUrl);    // Load post html
                                 RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");
                                 if (string.IsNullOrEmpty(html))
@@ -147,10 +129,8 @@ namespace EbParser
                                 var postDto = await postParser.GetPostDtoAsync();
                                 postDto.Comments = await postParser.GetPostCommentsAsync();
                                 postDto.Files = _saveFiles ? await postParser.GetPostFilesAsync() : new List<string>();
-
-                                RaiseReport($"Post parsed: [{ stopWatch.Elapsed.TotalMilliseconds }]");
+                                RaiseReport($"Post parsed: [{ stopWatch.Elapsed.TotalMilliseconds }] ms");
                                 stopWatch.Restart();
-
                                 await _storage.SavePostAsync(postUrl, postDto);
                                 RaiseReport($"Post saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
                             }
@@ -177,9 +157,15 @@ namespace EbParser
             }
         }
 
+        #endregion
+
+        #region Private
+
+        #region Parsing
+
         private async Task<int> ParsePagesCountAsync()
         {
-            var mainPageHtml = await LoadPageAsync(string.Format(Pattern, 0));  // Main page
+            var mainPageHtml = await LoadPageAsync(string.Format(PagePattern, 0));  // Main page
             var pageLinks = await _parser.ParseHtmlAsync(mainPageHtml, EbSelectors.PagesSelector);
             var lastPage = pageLinks.Last();
             var result = await _parser.ParseTextAsync(lastPage, "a");

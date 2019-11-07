@@ -9,6 +9,7 @@ namespace EbParser
 {
     class Program
     {
+        private static readonly string Separator = new string('=', 50);
         private const string SaveFilesArg = "-f";
         private const string StartPageArg = "-p=";
         private static StringBuilder _sb;
@@ -60,7 +61,9 @@ namespace EbParser
 
         private static void Worker_PageChangded(object sender, Uri e)
         {
+            Print(Separator);
             Print($"Page: { e.AbsoluteUri }");
+            Print(Separator);
         }
 
         #endregion

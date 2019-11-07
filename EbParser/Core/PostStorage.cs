@@ -19,6 +19,7 @@ namespace EbParser.Core
 
         private const string Site = "https://ebanoe.it";
         private const string FileDirectory = "files";
+        private const int Attemps = 4;
 
         #endregion
 
@@ -248,7 +249,7 @@ namespace EbParser.Core
         private async Task<bool> LoadFileAsync(string url, string newName)
         {
             var result = false;
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < Attemps; i++)
             {
                 try
                 {
@@ -267,6 +268,7 @@ namespace EbParser.Core
                         await Task.Delay(TimeSpan.FromSeconds(5 + i));
                     }
                 }
+                catch { }
             }
 
             return result;
