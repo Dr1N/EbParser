@@ -26,7 +26,7 @@ namespace EbParser.Core
         #region Fields
 
         private SiteContext _db;
-        private ILoader _loader;
+        private ILoader _loader; // TODO: remove
 
         #endregion
 
@@ -246,6 +246,7 @@ namespace EbParser.Core
             return result;
         }
 
+        // TODO: Duplicate
         private async Task<bool> LoadFileAsync(string url, string newName)
         {
             var result = false;
@@ -274,6 +275,7 @@ namespace EbParser.Core
             return result;
         }
 
+        // TODO: Move
         private string CreateFilesDirecory()
         {
             if (!Directory.Exists(FileDirectory))
