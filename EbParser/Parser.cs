@@ -21,10 +21,10 @@ namespace EbParser
 
         #region Fields
 
-        private readonly IHtmlParser _parser;
-        private readonly IPostStorage _storage;
         private readonly bool _saveFiles;
         private readonly int _start;
+        private readonly IHtmlParser _parser;
+        private readonly IPostStorage _storage;
         private ILoader _loader;
 
         #endregion
@@ -41,11 +41,11 @@ namespace EbParser
 
         public Parser(bool saveFiles, int? startPage = null)
         {
+            _saveFiles = saveFiles;
+            _start = startPage ?? 0;
             _loader = new PageLoader();
             _parser = new AngelParser();
             _storage = new PostStorage();
-            _saveFiles = saveFiles;
-            _start = startPage ?? 0;
         }
 
         #region IDisposable Support
@@ -118,7 +118,7 @@ namespace EbParser
                                 RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");
                                 if (string.IsNullOrEmpty(html))
                                 {
-                                    RaiseError($"Can't load page: {postUrl}");
+                                    RaiseError($"Can't load page: { postUrl }");
                                     continue;
                                 }
                                 stopWatch.Restart();
@@ -193,7 +193,7 @@ namespace EbParser
                         await Task.Delay(TimeSpan.FromSeconds(5 + i));      // Wait and continue
                     }
                     else if (ex.Message.Contains(HttpStatusCode.BadRequest.ToString())
-                            || ex.Message.Contains(HttpStatusCode.InternalServerError.ToString()))     // Create new loader
+                            || ex.Message.Contains(HttpStatusCode.InternalServerError.ToString()))     // Create new loader // TODO
                     {
                         (_loader as IDisposable)?.Dispose();
                         _loader = new PageLoader();

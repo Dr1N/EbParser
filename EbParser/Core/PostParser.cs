@@ -86,15 +86,19 @@ namespace EbParser.Core
 
             foreach (var comment in commentsList)
             {
-                var commentDto = GetCommentFromItemAsync(comment);
-                var parent = FindParentAsync(comment, "li");
-                if (parent != null)
+                try
                 {
-                    var parentId = parent.QuerySelector(EbSelectors.PostCommentIdSelector).GetAttribute("id");
-                    commentDto.ParrentId = int.Parse(parentId.Split('-').Last());
-                }
+                    var commentDto = GetCommentFromItemAsync(comment);
+                    var parent = FindParentAsync(comment, "li");
+                    if (parent != null)
+                    {
+                        var parentId = parent.QuerySelector(EbSelectors.PostCommentIdSelector).GetAttribute("id");
+                        commentDto.ParrentId = int.Parse(parentId.Split('-').Last());
+                    }
 
-                result.Add(commentDto);
+                    result.Add(commentDto);
+                }
+                catch { }
             }
 
             return result;
@@ -138,8 +142,11 @@ namespace EbParser.Core
             var tags = document.QuerySelectorAll(EbSelectors.PostTagstSelector);
             foreach (var tag in tags)
             {
-                var tagName = tag.QuerySelector("a").TextContent;
-                result.Add(tagName);
+                try
+                {
+                    result.Add(tag.QuerySelector("a").TextContent);
+                }
+                catch { }
             }
 
             return result;
@@ -152,13 +159,18 @@ namespace EbParser.Core
             var publish = commentElement.QuerySelector(EbSelectors.PostCommentDateSelector).TextContent;
             var content = commentElement.QuerySelector(EbSelectors.PostCommentContentSelector).TextContent;
 
-            return new CommentDto()
+            if (int.TryParse(id.Split('-').Last(), out int idInt))
             {
-                Id = int.Parse(id.Split('-').Last()),
-                Author = author,
-                Publish = ParseCommentPublishTime(publish),
-                Content = content,
-            };
+                return new CommentDto()
+                {
+                    Id = idInt,
+                    Author = author,
+                    Publish = ParseCommentPublishTime(publish),
+                    Content = content,
+                };
+            }
+
+            return null;
         }
 
         private IElement FindParentAsync(IElement element, string parent = null)

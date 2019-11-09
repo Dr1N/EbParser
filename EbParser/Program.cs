@@ -12,6 +12,9 @@ namespace EbParser
         private static readonly string Separator = new string('=', 50);
         private const string SaveFilesArg = "-f";
         private const string StartPageArg = "-p=";
+        private const string LogFile = "log.txt";
+        private const string ErrorsFile = "error.txt";
+
         private static StringBuilder _sb;
 
         static void Main(string[] args)
@@ -23,7 +26,10 @@ namespace EbParser
                     .GetAwaiter()
                     .GetResult();
             }
-            catch { }
+            catch (Exception ex) 
+            {
+                Print($"Critical: { ex.Message }");
+            }
 
             Console.ReadLine();
         }
@@ -33,30 +39,44 @@ namespace EbParser
             _sb = new StringBuilder();
             var stopWatch = Stopwatch.StartNew();
 
+            // Process command line arguments
+
             var saveFiles = args.Any(a => a == SaveFilesArg);
             var startPage = args.FirstOrDefault(a => a.Contains(StartPageArg))?.Split("=").Last();
             int.TryParse(startPage, out int page);
+
+            // Parse site
+
             using var parser = new Parser(saveFiles, page);
             parser.PageChangded += Worker_PageChangded;
             parser.Error += Worker_Error;
             parser.Report += Worker_Report;
             await parser.ParseAsync();
-            File.WriteAllText("parse.log", _sb.ToString());
-            _sb.Clear();
 
+            // Result
+
+            File.WriteAllText(LogFile, _sb.ToString());
+            _sb.Clear();
             Console.WriteLine($"Time: { stopWatch.Elapsed.TotalSeconds } sec");
+            Console.WriteLine($"See log: { LogFile }");
+            Console.WriteLine($"See errors: { ErrorsFile }");
         }
 
         #region Callbacks
 
-        private static void Worker_Report(object sender, string e)
+        private static void Worker_Report(object sender, string message)
         {
-            Print($"Info: { e }");
+            Print($"Info: { message }");
         }
 
-        private static void Worker_Error(object sender, string e)
+        private static void Worker_Error(object sender, string message)
         {
-            Print($"Error: { e }", ConsoleColor.Red);
+            Print($"Error: { message }", ConsoleColor.Red);
+            try
+            {
+                File.AppendAllText(ErrorsFile, message);
+            }
+            catch { }
         }
 
         private static void Worker_PageChangded(object sender, Uri e)
