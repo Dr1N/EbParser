@@ -132,7 +132,7 @@ namespace EbParser
                                 RaiseReport($"Post parsed: [{ stopWatch.Elapsed.TotalMilliseconds }] ms");
                                 stopWatch.Restart();
                                 await _storage.SavePostAsync(postUrl, postDto);
-                                RaiseReport($"Post saved: { stopWatch.Elapsed.TotalMilliseconds } ms");
+                                RaiseReport($"Post saved: [{ stopWatch.Elapsed.TotalMilliseconds }] ms");
                             }
                             catch (Exception ex)
                             {
