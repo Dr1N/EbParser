@@ -1,4 +1,4 @@
-﻿using CloudFlareUtilities;
+﻿using CloudflareSolverRe;
 using EbParser.Interfaces;
 using System;
 using System.IO;
