@@ -12,7 +12,6 @@ namespace EbParser.Core
     {
         #region Fields
 
-        private readonly HttpClientHandler _httpClientHandler;
         private readonly ClearanceHandler _clearanceHandler;
         private readonly HttpClient _httpClient;
 
@@ -22,9 +21,13 @@ namespace EbParser.Core
 
         public PageLoader()
         {
-            _httpClientHandler = new HttpClientHandler();
-            _clearanceHandler = new ClearanceHandler(_httpClientHandler);
-            _httpClient = new HttpClient(_clearanceHandler, false);
+            _clearanceHandler = new ClearanceHandler
+            {
+                MaxTries = 3,
+                ClearanceDelay = 3000
+            };
+
+            _httpClient = new HttpClient(_clearanceHandler, true);
         }
 
         #region IDisposable Support
@@ -37,8 +40,6 @@ namespace EbParser.Core
             {
                 if (disposing)
                 {
-                    _httpClientHandler.Dispose();
-                    _clearanceHandler.Dispose();
                     _httpClient.Dispose();
                 }
 
@@ -64,16 +65,17 @@ namespace EbParser.Core
                 throw new ArgumentException(nameof(url));
             }
 
-            string result = string.Empty;
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             using var response = await _httpClient.SendAsync(request, CancellationToken.None);
+
+            string result;
             if (response.IsSuccessStatusCode)
             {
                 result = await response.Content.ReadAsStringAsync();
             }
             else
             {
-                 throw new HttpRequestException($"Status Code: { response.StatusCode }");
+                throw new HttpRequestException($"Status Code: { response.StatusCode }");
             }
 
             return result;
