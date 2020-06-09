@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace EbParser.Core
 {
-    class PageLoader : ILoader, IDisposable
+    internal class PageLoader : ILoader, IDisposable
     {
         #region Fields
 
@@ -23,7 +23,7 @@ namespace EbParser.Core
         {
             _clearanceHandler = new ClearanceHandler
             {
-                MaxTries = 3,
+                MaxTries = 5,
                 ClearanceDelay = 3000
             };
 
@@ -60,25 +60,22 @@ namespace EbParser.Core
 
         public async Task<string> LoadPageAsync(string url)
         {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
+            if (!Uri.TryCreate(url, UriKind.Absolute, out _))
             {
                 throw new ArgumentException(nameof(url));
             }
 
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            using var response = await _httpClient.SendAsync(request, CancellationToken.None);
+            using var response = await _httpClient.SendAsync(request, CancellationToken.None).ConfigureAwait(false);
 
-            string result;
             if (response.IsSuccessStatusCode)
             {
-                result = await response.Content.ReadAsStringAsync();
+                return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             }
             else
             {
                 throw new HttpRequestException($"Status Code: { response.StatusCode }");
             }
-
-            return result;
         }
 
         public async Task<bool> LoadFileAsync(string url, string path)
@@ -87,27 +84,26 @@ namespace EbParser.Core
             {
                 throw new ArgumentNullException(nameof(path));
             }
+
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
             {
                 throw new ArgumentException(nameof(url));
             }
 
-            var result = false;
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            using var response = await _httpClient.SendAsync(request, CancellationToken.None);
+            using var response = await _httpClient.SendAsync(request, CancellationToken.None).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {
-                using var contentStream = await response.Content.ReadAsStreamAsync();
+                using var contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
                 using var fsStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-                await contentStream.CopyToAsync(fsStream);
-                result = true;
+                await contentStream.CopyToAsync(fsStream).ConfigureAwait(false);
+
+                return true;
             }
             else
             {
                 throw new HttpRequestException(response.StatusCode.ToString());
             }
-
-            return result;
         }
 
         #endregion

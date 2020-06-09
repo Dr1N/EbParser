@@ -39,7 +39,7 @@ namespace EbParser.Core
             }
 
             var result = new List<string>();
-            var elements = await GetElementsAsync(html, selector);
+            var elements = await GetElementsAsync(html, selector).ConfigureAwait(false);
             foreach (var element in elements)
             {
                 result.Add(element.OuterHtml);
@@ -64,7 +64,7 @@ namespace EbParser.Core
             }
 
             string result = null;
-            var elements = await GetElementsAsync(html, selector);
+            var elements = await GetElementsAsync(html, selector).ConfigureAwait(false);
             if (elements.Any())
             {
                 result = elements.First().GetAttribute(attribute);
@@ -85,7 +85,7 @@ namespace EbParser.Core
             }
 
             string result = null;
-            var elements = await GetElementsAsync(html, selector);
+            var elements = await GetElementsAsync(html, selector).ConfigureAwait(false);
             if (elements.Any())
             {
                 result = elements.First().TextContent;
@@ -101,7 +101,7 @@ namespace EbParser.Core
         private async Task<IList<IElement>> GetElementsAsync(string html, string selector)
         {
             var result = new List<IElement>();
-            var document = await _browsingContext.OpenAsync(req => req.Content(html));
+            var document = await _browsingContext.OpenAsync(req => req.Content(html)).ConfigureAwait(false);
             if (document != null && document.All.Any())
             {
                 var elements = document.QuerySelectorAll(selector);

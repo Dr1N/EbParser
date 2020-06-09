@@ -58,14 +58,14 @@ namespace EbParser.Core
         public async Task<PostDto> GetPostDtoAsync()
         {
             var result = new PostDto();
-            var document = await GetDocumentAsync();
+            var document = await GetDocumentAsync().ConfigureAwait(false);
             var title = document.QuerySelector(EbSelectors.PostTitleSelector).TextContent;
             var author = document.QuerySelector(EbSelectors.PostAuthorSelector).TextContent;
             var dateTime = document.QuerySelector(EbSelectors.PostTimeSelector).GetAttribute("datetime");
             var poster = document.QuerySelector(EbSelectors.PostPosterSelector).GetAttribute("src");
             var content = document.QuerySelectorAll(EbSelectors.PostContentSelector).FirstOrDefault().OuterHtml;
             var category = document.QuerySelector(EbSelectors.PostCategorytSelector).TextContent;
-            var tags = await GetPostTagsAsync();
+            var tags = await GetPostTagsAsync().ConfigureAwait(false);
 
             result.Title = title;
             result.Author = author;
@@ -81,7 +81,7 @@ namespace EbParser.Core
         public async Task<IList<CommentDto>> GetPostCommentsAsync()
         {
             var result = new List<CommentDto>();
-            var document = await GetDocumentAsync();
+            var document = await GetDocumentAsync().ConfigureAwait(false);
             var commentsList = document.QuerySelectorAll(EbSelectors.PostCommentListSelector);
 
             foreach (var comment in commentsList)
@@ -107,7 +107,7 @@ namespace EbParser.Core
         public async Task<IList<string>> GetPostFilesAsync()
         {
             var result = new List<string>();
-            var document = await GetDocumentAsync();
+            var document = await GetDocumentAsync().ConfigureAwait(false);
             var poster = document.QuerySelector(EbSelectors.PostPosterSelector).GetAttribute("src");
             result.Add(poster);
             var content = document.QuerySelectorAll(EbSelectors.PostContentSelector).FirstOrDefault();
@@ -129,7 +129,7 @@ namespace EbParser.Core
         {
             if (_document == null)
             {
-                _document = await _browsingContext.OpenAsync(req => req.Content(_html));
+                _document = await _browsingContext.OpenAsync(req => req.Content(_html)).ConfigureAwait(false);
             }
 
             return _document;
@@ -138,7 +138,7 @@ namespace EbParser.Core
         private async Task<IList<string>> GetPostTagsAsync()
         {
             var result = new List<string>();
-            var document = await GetDocumentAsync();
+            var document = await GetDocumentAsync().ConfigureAwait(false);
             var tags = document.QuerySelectorAll(EbSelectors.PostTagstSelector);
             foreach (var tag in tags)
             {

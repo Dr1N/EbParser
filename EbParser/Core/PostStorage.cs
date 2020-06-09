@@ -69,7 +69,7 @@ namespace EbParser.Core
         {
             using (_db = new SiteContext())
             {
-                await SaveTagsAsync(postDto.Tags);
+                await SaveTagsAsync(postDto.Tags).ConfigureAwait(false);
                 var post = new Post()
                 {
                     Url = url,
@@ -82,16 +82,16 @@ namespace EbParser.Core
                 };
                 SavePostTags(postDto, post);
                 _db.Posts.Add(post);
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync().ConfigureAwait(false);
                 if (postDto.Comments.Count > 0)
                 {
-                    await SaveCommentsAsync(postDto.Comments, post);
-                    await _db.SaveChangesAsync();
+                    await SaveCommentsAsync(postDto.Comments, post).ConfigureAwait(false);
+                    await _db.SaveChangesAsync().ConfigureAwait(false);
                 }
                 if (postDto.Files.Count > 0)
                 {
-                    await SavePostFilesAsync(postDto.Files);
-                    await _db.SaveChangesAsync();
+                    await SavePostFilesAsync(postDto.Files).ConfigureAwait(false);
+                    await _db.SaveChangesAsync().ConfigureAwait(false);
                 }
             }
             _db = null;
@@ -133,7 +133,7 @@ namespace EbParser.Core
                     _db.Tags.Add(new Tag() { Name = tagName });
                 }
             }
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync().ConfigureAwait(false);
         }
 
         private void SavePostTags(PostDto postDto, Post post)
@@ -163,9 +163,9 @@ namespace EbParser.Core
                     Updated = DateTime.Now,
                 };
                 _db.Comments.Add(dbComment);
-                await SaveChildCommentsAsync(comments, comment, dbComment, post);
+                await SaveChildCommentsAsync(comments, comment, dbComment, post).ConfigureAwait(false);
             }
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync().ConfigureAwait(false);
         }
 
         private async Task SaveChildCommentsAsync(IList<CommentDto> allComments, 
@@ -193,7 +193,7 @@ namespace EbParser.Core
                     Updated = DateTime.Now,
                 };
                 _db.Comments.Add(dbComment);
-                await SaveChildCommentsAsync(allComments, child, dbComment, post);
+                await SaveChildCommentsAsync(allComments, child, dbComment, post).ConfigureAwait(false);
             }
         }
 
@@ -205,7 +205,7 @@ namespace EbParser.Core
             {
                 var task = Task.Run(async () =>
                 {
-                    var name = await SaveSiteFileAsync(fileSrc);
+                    var name = await SaveSiteFileAsync(fileSrc).ConfigureAwait(false);
                     if (!string.IsNullOrEmpty(name))
                     {
                         var file = new Context.File()
@@ -220,7 +220,7 @@ namespace EbParser.Core
             }
             Task.WaitAll(tasks.ToArray());
             _db.Files.AddRange(bag);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync().ConfigureAwait(false);
         }
 
         private async Task<string> SaveSiteFileAsync(string url)
@@ -240,7 +240,7 @@ namespace EbParser.Core
             var directory = CreateFilesDirecory();
             var ext = Path.GetExtension(fileName);
             var newName = Path.Combine(directory, Guid.NewGuid().ToString() + ext);
-            await LoadFileAsync(url, newName);
+            await LoadFileAsync(url, newName).ConfigureAwait(false);
             result = newName;
 
             return result;
@@ -254,19 +254,19 @@ namespace EbParser.Core
             {
                 try
                 {
-                    result = await _loader.LoadFileAsync(url, newName);
+                    result = await _loader.LoadFileAsync(url, newName).ConfigureAwait(false);
                 }
                 catch (HttpRequestException ex)
                 {
                     if (ex.Message.Contains(HttpStatusCode.TooManyRequests.ToString()))
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(5 + i));      // Wait and continue
+                        await Task.Delay(TimeSpan.FromSeconds(5 + i)).ConfigureAwait(false);      // Wait and continue
                     }
                     else if (ex.Message.Contains(HttpStatusCode.BadRequest.ToString()))     // Create new loader
                     {
                         (_loader as IDisposable)?.Dispose();
                         _loader = new PageLoader();
-                        await Task.Delay(TimeSpan.FromSeconds(5 + i));
+                        await Task.Delay(TimeSpan.FromSeconds(5 + i)).ConfigureAwait(false);
                     }
                 }
                 catch { }

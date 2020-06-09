@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace EbParser
 {
-    class Program
+    static class Program
     {
         private static readonly string Separator = new string('=', 50);
         private const string SaveFilesArg = "-f";
@@ -16,8 +16,9 @@ namespace EbParser
         private const string ErrorsFile = "error.txt";
 
         private static StringBuilder _sb;
+        private static readonly object _lockObject = new object();
 
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             try
             {
@@ -34,7 +35,7 @@ namespace EbParser
             Console.ReadLine();
         }
 
-        static async Task MainAsync(string[] args)
+        private static async Task MainAsync(string[] args)
         {
             _sb = new StringBuilder();
             var stopWatch = Stopwatch.StartNew();
@@ -42,7 +43,7 @@ namespace EbParser
             // Process command line arguments
 
             var saveFiles = args.Any(a => a == SaveFilesArg);
-            var startPage = args.FirstOrDefault(a => a.Contains(StartPageArg))?.Split("=").Last();
+            var startPage = Array.Find(args, a => a.Contains(StartPageArg))?.Split("=").Last();
             int.TryParse(startPage, out int page);
 
             // Parse site
@@ -51,7 +52,7 @@ namespace EbParser
             parser.PageChangded += Worker_PageChangded;
             parser.Error += Worker_Error;
             parser.Report += Worker_Report;
-            await parser.ParseAsync();
+            await parser.ParseAsync().ConfigureAwait(false);
 
             // Result
 
@@ -93,7 +94,7 @@ namespace EbParser
         private static void Print(string message, ConsoleColor color = ConsoleColor.White)
         {
             var dt = DateTime.Now;
-            lock(typeof(Console))
+            lock(_lockObject)
             {
                 Console.ForegroundColor = color;
                 try

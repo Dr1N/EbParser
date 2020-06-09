@@ -83,7 +83,7 @@ namespace EbParser
             try
             {
                 RaiseReport("START");
-                var pages = await ParsePagesCountAsync();   // Site peges count
+                var pages = await ParsePagesCountAsync().ConfigureAwait(false);   // Site peges count
                 RaiseReport($"Pages: { pages }");
                 var lastUrl = _storage.GetLastPostUrl();    // Load last parsed post
                 RaiseReport($"Last: { lastUrl ?? "New session" }");
@@ -96,7 +96,7 @@ namespace EbParser
                         var pageUrl = string.Format(PagePattern, i);
 
                         RaisePage(new Uri(pageUrl));
-                        var postLinkTags = await GetPostUrlsFromPageAsync(pageUrl);    // Parse post url's from page
+                        var postLinkTags = await GetPostUrlsFromPageAsync(pageUrl).ConfigureAwait(false);    // Parse post url's from page
                         var stopWatch = Stopwatch.StartNew();
                         foreach (var postUrl in postLinkTags)
                         {
@@ -114,7 +114,7 @@ namespace EbParser
                                 }
 
                                 stopWatch.Restart();
-                                var html = await LoadPageAsync(postUrl);    // Load post html
+                                var html = await LoadPageAsync(postUrl).ConfigureAwait(false);    // Load post html
                                 RaiseReport($"Page loaded: [{ stopWatch.Elapsed.TotalMilliseconds }]");
                                 if (string.IsNullOrEmpty(html))
                                 {
@@ -126,12 +126,12 @@ namespace EbParser
                                 // Parse elements and save to storage
 
                                 using var postParser = new PostParser(html);
-                                var postDto = await postParser.GetPostDtoAsync();
-                                postDto.Comments = await postParser.GetPostCommentsAsync();
-                                postDto.Files = _saveFiles ? await postParser.GetPostFilesAsync() : new List<string>();
+                                var postDto = await postParser.GetPostDtoAsync().ConfigureAwait(false);
+                                postDto.Comments = await postParser.GetPostCommentsAsync().ConfigureAwait(false);
+                                postDto.Files = _saveFiles ? await postParser.GetPostFilesAsync().ConfigureAwait(false) : new List<string>();
                                 RaiseReport($"Post parsed: [{ stopWatch.Elapsed.TotalMilliseconds }] ms");
                                 stopWatch.Restart();
-                                await _storage.SavePostAsync(postUrl, postDto);
+                                await _storage.SavePostAsync(postUrl, postDto).ConfigureAwait(false);
                                 RaiseReport($"Post saved: [{ stopWatch.Elapsed.TotalMilliseconds }] ms");
                             }
                             catch (Exception ex)
@@ -165,14 +165,14 @@ namespace EbParser
 
         private async Task<int> ParsePagesCountAsync()
         {
-            var mainPageHtml = await LoadPageAsync(string.Format(PagePattern, 0));  // Main page
-            var pageLinks = await _parser.ParseHtmlAsync(mainPageHtml, EbSelectors.PagesSelector);
+            var mainPageHtml = await LoadPageAsync(string.Format(PagePattern, 0)).ConfigureAwait(false);  // Main page
+            var pageLinks = await _parser.ParseHtmlAsync(mainPageHtml, EbSelectors.PagesSelector).ConfigureAwait(false);
             var lastPage = pageLinks.Last();
-            var result = await _parser.ParseTextAsync(lastPage, "a");
+            var result = await _parser.ParseTextAsync(lastPage, "a").ConfigureAwait(false);
 
             return int.Parse(result);
         }
-       
+
         private async Task<string> LoadPageAsync(string url)
         {
             var result = string.Empty;
@@ -180,7 +180,7 @@ namespace EbParser
             {
                 try
                 {
-                    result = await _loader.LoadPageAsync(url);
+                    result = await _loader.LoadPageAsync(url).ConfigureAwait(false);
                     if (!string.IsNullOrEmpty(result))
                     {
                         break;
@@ -190,14 +190,14 @@ namespace EbParser
                 {
                     if (ex.Message.Contains(HttpStatusCode.TooManyRequests.ToString()))
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(5 + i));      // Wait and continue
+                        await Task.Delay(TimeSpan.FromSeconds(5 + i)).ConfigureAwait(false);      // Wait and continue
                     }
                     else if (ex.Message.Contains(HttpStatusCode.BadRequest.ToString())
                             || ex.Message.Contains(HttpStatusCode.InternalServerError.ToString()))     // Create new loader // TODO
                     {
                         (_loader as IDisposable)?.Dispose();
                         _loader = new PageLoader();
-                        await Task.Delay(TimeSpan.FromSeconds(5 + i));
+                        await Task.Delay(TimeSpan.FromSeconds(5 + i)).ConfigureAwait(false);
                     }
                 }
             }
@@ -208,11 +208,11 @@ namespace EbParser
         private async Task<IList<string>> GetPostUrlsFromPageAsync(string pageUrl)
         {
             var result = new List<string>();
-            var content = await LoadPageAsync(pageUrl);
-            var postTitles = await _parser.ParseHtmlAsync(content, EbSelectors.PostLinkSelector);
+            var content = await LoadPageAsync(pageUrl).ConfigureAwait(false);
+            var postTitles = await _parser.ParseHtmlAsync(content, EbSelectors.PostLinkSelector).ConfigureAwait(false);
             foreach (var postTitle in postTitles)
             {
-                var url = await _parser.ParseAttributeAsync(postTitle, "a", "href");
+                var url = await _parser.ParseAttributeAsync(postTitle, "a", "href").ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(url))
                 {
                     result.Add(url);
