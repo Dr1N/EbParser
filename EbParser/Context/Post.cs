@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace EbParser.Context
 {
-    class Post
+    internal class Post
     {
         [Key]
         public int Id { get; set; }

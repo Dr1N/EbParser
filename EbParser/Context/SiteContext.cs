@@ -2,7 +2,7 @@
 
 namespace EbParser.Context
 {
-    class SiteContext : DbContext
+    internal class SiteContext : DbContext
     {
         public DbSet<Post> Posts { get; set; }
 

@@ -8,12 +8,12 @@ using System.Threading.Tasks;
 
 namespace EbParser.Core
 {
-    class AngelParser : IHtmlParser
+    internal class AngelParser : IHtmlParser
     {
         #region Fields
 
         private readonly IBrowsingContext _browsingContext;
-        
+
         #endregion
 
         #region Life

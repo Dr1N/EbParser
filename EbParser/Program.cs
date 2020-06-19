@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace EbParser
 {
-    static class Program
+    internal static class Program
     {
         private static readonly string Separator = new string('=', 50);
         private const string SaveFilesArg = "-f";
@@ -27,7 +27,7 @@ namespace EbParser
                     .GetAwaiter()
                     .GetResult();
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 Print($"Critical: { ex.Message }");
             }
@@ -94,7 +94,7 @@ namespace EbParser
         private static void Print(string message, ConsoleColor color = ConsoleColor.White)
         {
             var dt = DateTime.Now;
-            lock(_lockObject)
+            lock (_lockObject)
             {
                 Console.ForegroundColor = color;
                 try

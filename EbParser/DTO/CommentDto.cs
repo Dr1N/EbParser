@@ -2,7 +2,7 @@
 
 namespace EbParser.DTO
 {
-    class CommentDto
+    internal class CommentDto
     {
         public int Id { get; set; }
 

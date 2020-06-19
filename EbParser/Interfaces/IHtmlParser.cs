@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace EbParser.Interfaces
 {
-    interface IHtmlParser
+    internal interface IHtmlParser
     {
         Task<IList<string>> ParseHtmlAsync(string html, string selector);
 

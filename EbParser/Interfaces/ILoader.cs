@@ -2,7 +2,7 @@
 
 namespace EbParser.Interfaces
 {
-    interface ILoader
+    internal interface ILoader
     {
         Task<string> LoadPageAsync(string url);
 

@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace EbParser.Core
 {
-    class PostStorage : IPostStorage, IDisposable
+    internal class PostStorage : IPostStorage, IDisposable
     {
         #region Constants
 
@@ -168,9 +168,9 @@ namespace EbParser.Core
             await _db.SaveChangesAsync().ConfigureAwait(false);
         }
 
-        private async Task SaveChildCommentsAsync(IList<CommentDto> allComments, 
-            CommentDto parent, 
-            Comment parentModel, 
+        private async Task SaveChildCommentsAsync(IList<CommentDto> allComments,
+            CommentDto parent,
+            Comment parentModel,
             Post post)
         {
             var children = allComments

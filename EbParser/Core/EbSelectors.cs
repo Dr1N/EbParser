@@ -1,6 +1,6 @@
 ﻿namespace EbParser.Core
 {
-    static class EbSelectors
+    internal static class EbSelectors
     {
         public const string PagesSelector = "div.pages>a.page";
         public const string PostLinkSelector = "h3.entry-title a";

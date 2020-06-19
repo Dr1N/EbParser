@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace EbParser.Interfaces
 {
-    interface IParser
+    internal interface IParser
     {
         event EventHandler<Uri> PageChangded;
 

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace EbParser.Core
 {
-    class PostParser : IPostParser, IDisposable
+    internal class PostParser : IPostParser, IDisposable
     {
         #region Fields
 

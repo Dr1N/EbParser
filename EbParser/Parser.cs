@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace EbParser
 {
-    class Parser : IParser, IDisposable
+    internal class Parser : IParser, IDisposable
     {
         #region Constants
 

@@ -4,12 +4,12 @@ using EbParser.DTO;
 
 namespace EbParser.Interfaces
 {
-    interface IPostParser
+    internal interface IPostParser
     {
         Task<IList<CommentDto>> GetPostCommentsAsync();
-        
+
         Task<PostDto> GetPostDtoAsync();
-        
+
         Task<IList<string>> GetPostFilesAsync();
     }
 }

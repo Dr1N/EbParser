@@ -2,7 +2,7 @@
 
 namespace EbParser.Context
 {
-    class File
+    internal class File
     {
         [Key]
         public int Id { get; set; }

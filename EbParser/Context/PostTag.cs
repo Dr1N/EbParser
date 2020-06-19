@@ -1,6 +1,6 @@
 ﻿namespace EbParser.Context
 {
-    class PostTag
+    internal class PostTag
     {
         public int PostId { get; set; }
 

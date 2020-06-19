@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace EbParser.Context
 {
-    class Tag
+    internal class Tag
     {
         [Key]
         public int Id { get; set; }

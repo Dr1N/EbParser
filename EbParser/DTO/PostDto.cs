@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace EbParser.DTO
 {
-    class PostDto
+    internal class PostDto
     {
         public string Title { get; set; }
 
